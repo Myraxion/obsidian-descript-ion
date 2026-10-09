@@ -1,5 +1,7 @@
 # Descript.ion comments: desktop UTF-8 comment management
 
+Status as of 2026-10-09: context-menu editing (#2) and file explorer comment tooltips (#3) are implemented and accepted. The remaining first-release features are pending; see the [task index](../design/descript-ion-tickets.md). File explorer tooltip behavior reflects the user's later confirmed [position and size decisions](../design/file-tree-tooltip-position.md).
+
 ## Problem Statement
 
 Obsidian users who maintain file and folder comments in Total Commander cannot conveniently view or edit those comments inside Obsidian. Moving, renaming, or deleting a note, attachment, or folder can leave its descript.ion comment entry stale or orphaned. Manually editing these files also risks breaking encoding, TC multiline escapes, or another program's fields.
@@ -19,7 +21,7 @@ Maintain comment entries when objects are moved, renamed, or deleted inside Obsi
 3. As an Obsidian desktop user, I want to comment on a folder using its parent's description file, so that its comment follows the same directory-based convention as TC.
 4. As a Vault owner, I want comment management confined to my current Vault, so that unrelated files are not accessed or modified.
 5. As an Obsidian desktop user, I want to hover over a file explorer object and see its comment, so that I can understand it without opening an editor.
-6. As an Obsidian desktop user, I want multiline comments to remain readable in tooltips, so that their full meaning is preserved.
+6. As an Obsidian desktop user, I want multiline comments to remain readable in a bounded file explorer tooltip, with overflow clipped and the full comment available through the editor.
 7. As an Obsidian desktop user, I want to add or modify a comment from a file or folder context menu, so that editing is available beside the object.
 8. As an Obsidian desktop user, I want a plain-text multiline input with save, delete-comment, and cancel actions, so that I can explicitly manage a comment.
 9. As a keyboard user, I want Enter to insert a newline, Ctrl/Cmd+Enter to save, and Escape to cancel, so that editing behaves predictably.
@@ -75,6 +77,7 @@ Maintain comment entries when objects are moved, renamed, or deleted inside Obsi
 - Keep plugin lifecycle and registration small. Separate responsibilities for byte-format handling, comment operations and storage, lifecycle event integration, cleanup commands, and UI. These are internal responsibilities, not multiple required public testing interfaces.
 - Introduce a high-level comment service boundary for reading, saving, deleting, synchronizing lifecycle changes, and cleaning orphan comments. Its public results must allow callers to distinguish successful changes, read-only or unsupported files, conflicts, limits, stale edit state, and storage failures. Use a replaceable Vault storage adapter beneath this boundary, without requiring a particular class layout or test framework.
 - Prefer public Obsidian APIs for file/folder context menus, modals, commands, status-bar registration, and event cleanup. Contain file explorer DOM dependence in a small tooltip compatibility layer. Never interpret comment text as Markdown or HTML.
+- File explorer comment tooltips align with the filename's left edge, appear below the row with an 8px gap, and flip above when space is insufficient. Limit them to 320px wide and 160px high, further reduced to fit the viewport; wrap long lines and clip height overflow without scrolling. They do not receive pointer interactions and close about 150ms after leaving the row; switching rows clears the old tooltip immediately. Leave native tooltips unchanged. Fixed placement reduces overlap probability without guaranteeing collision avoidance. These rules apply to the file explorer, not the future status-bar tooltip.
 - Use byte-aware input/output where needed to validate UTF-8 and control the BOM, line endings, escapes, and TC extension marker. Do not assume descript.ion always appears as an indexed Obsidian file. Check actual storage existence for cleanup.
 - Accept valid UTF-8 with or without a BOM, and CR, LF, or CRLF record separators. ASCII is valid UTF-8; do not infer an originating editor or convert other encodings.
 - Successful writes use BOM bytes `EF BB BF`, CRLF record separators, and no extra initial blank line. Names containing spaces are quoted. Single-line comments are ordinary text; TC-marked multiline comments encode newlines as literal backslash-n and backslashes as doubled backslashes, ending with UTF-8 bytes `04 C3 82`. Decode those escapes only for TC-marked records.
@@ -106,7 +109,7 @@ Maintain comment entries when objects are moved, renamed, or deleted inside Obsi
 - Cover changed description-file state and changed or removed edit targets. Verify that saving or deleting does not overwrite external content or act on an obsolete target.
 - Cover actual-storage orphan detection, current-directory nonrecursion, recursive Vault cleanup, internal-directory exclusion, empty-file removal, skipped protected files, and cleanup counts.
 - Cover externally changed stored comments being reread on the next public interaction; do not require a background polling test.
-- There is no existing test framework, test script, or similar test suite in the sample repository. Add the simplest suitable automated test setup; reuse the existing strict TypeScript build and Obsidian ESLint checks. Passing build and lint are required.
+- Reuse the existing Node test runner and esbuild-based service test setup, strict TypeScript build, and Obsidian ESLint checks. Passing build and lint are required.
 - Validate real Obsidian UI behavior separately: tooltips, menus, modal buttons and shortcuts, plain-text rendering, status-bar states, stale edits, actual file/folder lifecycle event behavior, direct description-file operations, and cleanup of listeners/UI on disable.
 - Verify bidirectional reads and writes with actual Total Commander, including Chinese text, spaced names, multiline comments, literal backslash-n, and backslashes. Capture real TC-produced byte fixtures for regression tests. Record automated validation and actual-application acceptance separately; both are required before declaring first-release acceptance complete.
 
@@ -123,10 +126,10 @@ Maintain comment entries when objects are moved, renamed, or deleted inside Obsi
 
 ## Further Notes
 
-- This specification synthesizes the accepted Q1–Q23 decisions. It is a specification-publication task, not an instruction to begin implementation or publish a plugin release.
-- The codebase currently contains the Obsidian sample plugin; none of the comment features or automated tests exist yet. The accepted glossary and the two decisions about understood UTF-8 writes and migration failure handling are the domain baseline.
+- This specification covers the full first-release scope, incorporating the accepted Q1–Q23 decisions and later confirmed file explorer tooltip changes. Completing #2 and #3 does not complete the whole release.
+- The accepted glossary and the two decisions about understood UTF-8 writes and migration failure handling remain the domain baseline. Implementation and acceptance evidence is recorded per task under `docs/testing/`.
 - Context7 was used to research the official Obsidian developer documentation. Public APIs cover context menus, modals, events, and the desktop status bar, but no supported file explorer tooltip hook was found. The DOM layer requires actual Obsidian validation. See [Vault guidance](https://docs.obsidian.md/Plugins/Vault), [context menus](https://docs.obsidian.md/Plugins/User+interface/Context+menus), [status bar](https://docs.obsidian.md/Plugins/User+interface/Status+bar), and [official API types](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts).
 - TC's author confirms the UTF-8 BOM and accepted line endings in the [format explanation](https://www.ghisler.ch/board/viewtopic.php?t=85478), the UTF-8 extension bytes in the [multiline extension explanation](https://www.ghisler.ch/board/viewtopic.php?t=45843), and marker-dependent escaping and the 4KB budget in the [escaping and length discussion](https://ghisler.ch/board/viewtopic.php?start=45&t=11238).
 - Whether TC counts CRLF in its own 4096-byte limit was not conclusively established. Including CRLF is an accepted conservative project constraint, not a claim about the unresolved official detail.
 - Public Obsidian APIs do not guarantee external rename recognition, directory descendant event counts/order, or transactions across two description files. The requirements deliberately avoid those guarantees.
-- The local environment supports Node and npm. Actual Obsidian/TC installation locations and a test Vault have not been established; portable or custom installations may exist. Do not mistake synthetic byte fixtures or successful build/lint for completed real-application acceptance.
+- The local environment supports Node and npm. The user accepted #2 and #3 in the test Vault `D:\Libraries\Obsidian\Demo\`; #3's recorded versions are Obsidian 1.14.4 and Total Commander 11.58. Synthetic byte fixtures and passing build/lint remain distinct from real-application acceptance; real TC byte fixtures have not been committed.

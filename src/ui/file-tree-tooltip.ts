@@ -44,13 +44,13 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 		tooltip.setAttribute('role', 'tooltip');
 		if (result.status !== 'ok') tooltip.addClass('descript-ion-message');
 		const bounds = row.getBoundingClientRect();
-		const below = Math.max(0, window.innerHeight - 8 - bounds.bottom - 6);
-		const above = Math.max(0, bounds.top - 6 - 8);
+		const below = Math.max(0, window.innerHeight - 8 - bounds.bottom);
+		const above = Math.max(0, bounds.top - 8);
 		const placeBelow = tooltip.offsetHeight <= below;
 		const available = placeBelow ? below : above;
 		tooltip.setCssProps({ '--descript-ion-max-height': `${Math.min(160, available)}px` });
 		const left = Math.max(8, Math.min(bounds.left, window.innerWidth - tooltip.offsetWidth - 8));
-		const top = placeBelow ? bounds.bottom + 6 : Math.max(8, bounds.top - 6 - tooltip.offsetHeight);
+		const top = placeBelow ? bounds.bottom : Math.max(8, bounds.top - tooltip.offsetHeight);
 		tooltip.setCssProps({ '--descript-ion-left': `${left}px`, '--descript-ion-top': `${top}px` });
 	}
 

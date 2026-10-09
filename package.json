@@ -1,10 +1,12 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "descript-ion",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Local UTF-8 descript.ion comments for Obsidian",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
+		"test": "node scripts/test.mjs",
+		"typecheck": "tsc -noEmit -skipLibCheck",
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",

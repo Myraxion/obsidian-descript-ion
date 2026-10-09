@@ -1,92 +1,53 @@
-# Obsidian Sample Plugin
+# Descript.ion comments
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+为 Obsidian 桌面端 Vault 内的笔记、附件和文件夹查看、编辑兼容 Total Commander 的 UTF-8 备注。数据仅保存在对象父目录的 `descript.ion` 中，不修改笔记正文，无网络请求或遥测。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 使用
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+在文件资源管理器右键文件或文件夹，选择 **编辑备注**。弹窗使用纯文本多行输入，不渲染 Markdown 或 HTML。
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and outputs a Notice on click.
-- Registers a global interval which logs 'setInterval' to the console.
+- **保存**：新增或修改备注；空或全空白输入删除备注，其他输入保留空格和换行。
+- **删除备注**：删除当前条目；最后一条删除后移除备注文件。
+- **取消** 或 Escape：关闭弹窗；Enter 换行，Ctrl/Cmd+Enter 保存。
 
-## First time developing plugins?
+Vault 根目录和 `descript.ion` 本身不接受备注。文件夹备注写在父目录，不影响文件夹内的备注文件。
 
-Quick starting guide for new plugin devs:
+本次实现对应 issue #2；悬浮提示、状态栏、随移动/重命名/删除维护备注及孤立备注清理属于后续任务。
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `src/main.ts` to `main.js`.
-- Make changes to `src/main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## 格式与编辑保护
 
-## Releasing new releases
+读取带/不带 BOM 的合法 UTF-8，以及 CR、LF、CRLF 行分隔。写回统一 UTF-8 BOM 与 CRLF，无开头空行。名称含空白时加双引号。多行备注按 TC 规则转义换行和反斜杠，末尾为 `04 C3 82`；没有 TC 标记时，`\n` 保持字面文字。完整记录含名称、空格、转义、标记和 CRLF 最多 4096 字节，BOM 不计入记录。
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+非 UTF-8、重复名称、异常记录或未知程序标记会使整个文件不可修改并显示原因，原始字节不变。超限或存储失败时保留弹窗输入，可修改后重试。
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+打开和提交时都读取实际存储。编辑期间备注文件改变，或对象被移动、重命名、删除，会暂停保存和删除，保留草稿；请先复制草稿，取消后重新打开对象并核对最新备注。不自动合并，也不提供跨程序文件锁；外部程序恰好在最后检查与写入之间修改仍可能发生竞争。
 
-## Adding your plugin to the community plugin list
+## 构建与检查
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+使用 Node.js 22/24 LTS 和 npm：
 
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v18 (`node --version`).
-- `npm i` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-	"fundingUrl": "https://buymeacoffee.com"
-}
+```powershell
+npm ci
+npm run typecheck
+npm test
+npm run lint
+npm run build
 ```
 
-If you have multiple URLs, you can also do:
+`npm run dev` 开启 esbuild 监视。测试用 Node 内建测试运行器与已有 esbuild，唯一主要边界为备注服务公开操作和可替换存储适配器。`.test-build/` 和 `main.js` 为忽略的生成产物。
 
-```json
-{
-	"fundingUrl": {
-		"Buy Me a Coffee": "https://buymeacoffee.com",
-		"GitHub Sponsor": "https://github.com/sponsors",
-		"Patreon": "https://www.patreon.com/"
-	}
-}
+最低 Obsidian 版本为 1.0.0：使用公开的 file-menu、Modal、Scope、Vault 和 DataAdapter 二进制 API，不依赖文件资源管理器私有 DOM。
+
+## 本地安装
+
+构建后将根目录的 `main.js`、`manifest.json`、`styles.css` 复制到测试 Vault 的 `.obsidian/plugins/descript-ion/`：
+
+```powershell
+$pluginPath = 'D:\Libraries\Obsidian\Demo\.obsidian\plugins\descript-ion'
+New-Item -ItemType Directory -Force -Path $pluginPath
+Copy-Item -LiteralPath main.js, manifest.json, styles.css -Destination $pluginPath
 ```
 
-## API Documentation
+重新加载 Obsidian，在 **设置 → 第三方插件** 中启用 **Descript.ion comments**。更新时重新构建并复制这三个文件，再禁用/启用插件或重新加载应用。
 
-See https://docs.obsidian.md
+真实应用验收由用户手动执行；步骤及结果记录见 [验收记录](docs/testing/issue-2.md)。自动测试的合成字节样本不能替代真实 TC 双向兼容性验收。

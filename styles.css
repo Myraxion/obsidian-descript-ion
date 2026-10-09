@@ -1,8 +1,14 @@
-/*
+.descript-ion-input {
+	width: 100%;
+	min-height: 12em;
+	resize: vertical;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.descript-ion-target {
+	overflow-wrap: anywhere;
+}
 
-If your plugin does not need CSS, delete this file.
-
-*/
+.descript-ion-message {
+	color: var(--text-error);
+	white-space: pre-wrap;
+}

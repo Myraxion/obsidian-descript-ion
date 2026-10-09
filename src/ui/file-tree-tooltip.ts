@@ -55,10 +55,6 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 	}
 
 	plugin.registerDomEvent(document, 'mouseover', event => {
-		if (event.target instanceof Node && tooltip?.contains(event.target)) {
-			cancelHide();
-			return;
-		}
 		const row = commentRow(event.target);
 		if (!row) return;
 		if (row !== current) void show(row);
@@ -66,7 +62,7 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 	});
 	plugin.registerDomEvent(document, 'mouseout', event => {
 		const next = event.relatedTarget;
-		if (next instanceof Node && (current?.contains(next) || tooltip?.contains(next))) {
+		if (next instanceof Node && current?.contains(next)) {
 			cancelHide();
 			return;
 		}
@@ -74,19 +70,13 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 			clear();
 			return;
 		}
-		if (event.target instanceof Node && (current?.contains(event.target) || tooltip?.contains(event.target))) {
+		if (event.target instanceof Node && current?.contains(event.target)) {
 			cancelHide();
 			hideTimer = window.setTimeout(clear, 150);
 		}
 	});
-	plugin.registerDomEvent(document, 'scroll', event => {
-		if (event.target instanceof Node && tooltip?.contains(event.target)) return;
-		clear();
-	}, true);
-	plugin.registerDomEvent(document, 'mousedown', event => {
-		if (event.target instanceof Node && tooltip?.contains(event.target)) return;
-		clear();
-	});
+	plugin.registerDomEvent(document, 'scroll', clear, true);
+	plugin.registerDomEvent(document, 'mousedown', clear);
 	plugin.registerDomEvent(document, 'keydown', clear);
 	plugin.registerDomEvent(window, 'blur', clear);
 	plugin.registerDomEvent(window, 'resize', clear);

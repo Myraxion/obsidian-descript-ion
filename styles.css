@@ -13,23 +13,25 @@
 	white-space: pre-wrap;
 }
 
-.tooltip.descript-ion-tooltip {
+.descript-ion-tooltip {
+	position: fixed;
+	left: var(--descript-ion-left, 8px);
+	top: var(--descript-ion-top, 8px);
+	z-index: var(--layer-tooltip);
 	max-width: min(32em, calc(100vw - 16px));
 	max-height: calc(100vh - 16px);
 	overflow: auto;
-	pointer-events: auto;
-	text-align: left;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-small);
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 
-.descript-ion-comment.descript-ion-message {
+.descript-ion-tooltip.descript-ion-message {
 	color: var(--text-error);
-}
-
-.descript-ion-official {
-	margin-top: 8px;
-	padding-top: 8px;
-	border-top: 1px solid currentColor;
-	opacity: 0.75;
 }

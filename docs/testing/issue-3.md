@@ -8,6 +8,10 @@
 
 现有服务已经满足读取要求，新增测试直接通过；本次没有为制造 red 阶段修改既有正确行为。UI 接入单独留给真实应用验收。
 
+2026-10-09：37 项自动测试全部通过；TypeScript 检查、生产构建、lint 和 `git diff --check` 通过。双轴审查：Standards 无发现；Spec 发现 SVG 图标悬浮未被识别，已将事件目标判断改为 Element，支持从 SVG 和 HTML 后代定位条目。没有未解决的审查发现。
+
+三个构建文件已安装到测试 Vault 的 `.obsidian/plugins/descript-ion/`，并验证与仓库产物的 SHA-256 一致。
+
 DOM 兼容假设：文件资源管理器容器为 `.workspace-leaf-content[data-type="file-explorer"]`，条目为 `.nav-file-title[data-path]` 和 `.nav-folder-title[data-path]`。所有选择器集中在小型兼容层，不使用私有文件树对象。Tooltip 通过文本节点显示内容；请求序号排除离开条目、快速切换与卸载后的旧读取结果。
 
 ## 用户手动验收

@@ -3,7 +3,7 @@ import { type CommentService, isCommentTarget } from '../comments/service';
 
 // File explorer rows have no public hover API. Keep private DOM selectors here.
 function commentRow(target: EventTarget | null): HTMLElement | null {
-	if (!(target instanceof HTMLElement)) return null;
+	if (!(target instanceof Element)) return null;
 	const row = target.closest<HTMLElement>('.nav-file-title[data-path], .nav-folder-title[data-path]');
 	return row?.closest('.workspace-leaf-content[data-type="file-explorer"]') ? row : null;
 }

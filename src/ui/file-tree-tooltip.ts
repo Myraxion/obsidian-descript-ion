@@ -15,8 +15,15 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 	let tooltip: HTMLElement | null = null;
 	let request = 0;
 	let active = true;
+	let hideTimer: number | undefined;
+
+	function cancelHide(): void {
+		window.clearTimeout(hideTimer);
+		hideTimer = undefined;
+	}
 
 	function clear(): void {
+		cancelHide();
 		request++;
 		current = null;
 		tooltip?.remove();
@@ -37,20 +44,40 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 		tooltip.setAttribute('role', 'tooltip');
 		if (result.status !== 'ok') tooltip.addClass('descript-ion-message');
 		const bounds = row.getBoundingClientRect();
-		const left = Math.max(8, Math.min(bounds.right - 4, window.innerWidth - tooltip.offsetWidth - 8));
-		const top = Math.max(8, Math.min(bounds.top, window.innerHeight - tooltip.offsetHeight - 8));
+		const below = Math.max(0, window.innerHeight - 8 - bounds.bottom - 6);
+		const above = Math.max(0, bounds.top - 6 - 8);
+		const placeBelow = tooltip.offsetHeight <= below;
+		const available = placeBelow ? below : above;
+		tooltip.setCssProps({ '--descript-ion-max-height': `${Math.min(160, available)}px` });
+		const left = Math.max(8, Math.min(bounds.left, window.innerWidth - tooltip.offsetWidth - 8));
+		const top = placeBelow ? bounds.bottom + 6 : Math.max(8, bounds.top - 6 - tooltip.offsetHeight);
 		tooltip.setCssProps({ '--descript-ion-left': `${left}px`, '--descript-ion-top': `${top}px` });
 	}
 
 	plugin.registerDomEvent(document, 'mouseover', event => {
-		if (event.target instanceof Node && tooltip?.contains(event.target)) return;
+		if (event.target instanceof Node && tooltip?.contains(event.target)) {
+			cancelHide();
+			return;
+		}
 		const row = commentRow(event.target);
-		if (row && row !== current) void show(row);
+		if (!row) return;
+		if (row !== current) void show(row);
+		else cancelHide();
 	});
 	plugin.registerDomEvent(document, 'mouseout', event => {
 		const next = event.relatedTarget;
-		if (next instanceof Node && (current?.contains(next) || tooltip?.contains(next))) return;
-		clear();
+		if (next instanceof Node && (current?.contains(next) || tooltip?.contains(next))) {
+			cancelHide();
+			return;
+		}
+		if (commentRow(next)) {
+			clear();
+			return;
+		}
+		if (event.target instanceof Node && (current?.contains(event.target) || tooltip?.contains(event.target))) {
+			cancelHide();
+			hideTimer = window.setTimeout(clear, 150);
+		}
 	});
 	plugin.registerDomEvent(document, 'scroll', event => {
 		if (event.target instanceof Node && tooltip?.contains(event.target)) return;

@@ -14,12 +14,13 @@
 }
 
 .descript-ion-tooltip {
+	box-sizing: border-box;
 	position: fixed;
 	left: var(--descript-ion-left, 8px);
 	top: var(--descript-ion-top, 8px);
 	z-index: var(--layer-tooltip);
-	max-width: min(32em, calc(100vw - 16px));
-	max-height: calc(100vh - 16px);
+	max-width: min(320px, calc(100vw - 16px));
+	max-height: min(var(--descript-ion-max-height, 160px), calc(100vh - 16px));
 	overflow: auto;
 	padding: 8px 12px;
 	border: 1px solid var(--background-modifier-border);

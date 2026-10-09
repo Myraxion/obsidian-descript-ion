@@ -17,7 +17,7 @@ export function parseDescription(bytes: Uint8Array | null): Map<string, string> 
 	const entries = new Map<string, string>();
 	for (const line of text.split(/\r\n|\r|\n/)) {
 		if (!line.trim()) continue;
-		const match = /^(?:"([^"\r\n]+)"|([^\s"]+)) (.*)$/.exec(line);
+		const match = /^(?:"([^"\r\n]+)"|([^\s"]+)) (.*)$/s.exec(line);
 		if (!match) throw new CommentError('readonly', '备注文件含异常记录，无法修改。');
 		const name = match[1] ?? match[2]!;
 		if (!validName(name)) throw new CommentError('readonly', '备注文件含异常名称，无法修改。');

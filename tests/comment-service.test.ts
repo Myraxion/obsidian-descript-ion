@@ -22,6 +22,14 @@ async function open(service: CommentService, path = 'a.md') {
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
+void test('合法 Unicode 行分隔符在备注中保真往返', async () => {
+	const storage = new MemoryStorage('a.md');
+	const service = new CommentService(storage);
+	const comment = '第一段\u2028第二段\u2029第三段';
+	assert.equal((await service.save((await open(service)).session, comment)).status, 'ok');
+	assert.equal((await open(service)).comment, comment);
+});
+
 for (const content of ['', '\uFEFF', '\r\n\n\r']) {
 	void test('已有空备注文件中删除空条目会移除文件', async () => {
 		const storage = new MemoryStorage('a.md');

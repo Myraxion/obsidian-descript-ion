@@ -16,7 +16,7 @@ DOM 兼容假设：文件资源管理器容器为 `.workspace-leaf-content[data-
 
 ## 用户手动验收
 
-测试 Vault：`D:\Libraries\Obsidian\Demo\`。真实应用验收由用户手动完成，以下项目待确认。
+测试 Vault：`D:\Libraries\Obsidian\Demo\`。真实应用验收由用户手动完成，验收步骤如下；用户确认结果见文末。
 
 1. 更新插件后禁用再启用，悬浮有备注的笔记、附件和文件夹；确认读取对象父目录中的备注，文件夹内部的备注文件不影响文件夹本身的备注。
 2. 验证中文、多行、`**粗体**` 和 `<b>字面文本</b>`；确认没有 Markdown/HTML 渲染，长备注可滚动，靠近窗口边缘仍可读。
@@ -29,5 +29,6 @@ DOM 兼容假设：文件资源管理器容器为 `.workspace-leaf-content[data-
 
 ## 实际结果
 
-- Obsidian UI 和 TC 外部修改验收：待用户确认。
-- Obsidian 与 TC 版本：待记录。
+- Obsidian UI 和 TC 外部修改验收：用户于 2026-10-09 确认已验证通过。
+- Obsidian 版本：1.14.4。
+- Total Commander 版本：11.58。

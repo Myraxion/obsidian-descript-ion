@@ -12,7 +12,9 @@
 
 Vault 根目录和 `descript.ion` 本身不接受备注。文件夹备注写在父目录，不影响文件夹内的备注文件。
 
-本次实现对应 issue #2；悬浮提示、状态栏、随移动/重命名/删除维护备注及孤立备注清理属于后续任务。
+在文件资源管理器悬浮笔记、附件或文件夹，查看纯文本备注；中文、换行、Markdown 和 HTML 均按字面内容显示。每次重新悬浮读取实际存储，TC 外部修改后下一次悬浮即可看到最新内容。无备注时不显示备注 Tooltip；读取失败或格式不可理解时显示原因，保持原文件。长备注可在 Tooltip 内滚动查看。
+
+当前已实现 issue #2 和 #3；状态栏、随移动/重命名/删除维护备注及孤立备注清理属于后续任务。
 
 ## 格式与编辑保护
 
@@ -38,7 +40,7 @@ npm run build
 
 `npm run dev` 开启 esbuild 监视。测试用 Node 内建测试运行器与已有 esbuild，唯一主要边界为备注服务公开操作和可替换存储适配器。`.test-build/` 和 `main.js` 为忽略的生成产物。
 
-最低 Obsidian 版本为 1.0.0：使用公开的 file-menu、Modal、Scope、Vault 和 DataAdapter 二进制 API，不依赖文件资源管理器私有 DOM。
+最低 Obsidian 版本为 1.0.0：编辑入口使用公开的 file-menu、Modal、Scope、Vault 和 DataAdapter 二进制 API。悬浮入口依赖文件资源管理器私有 DOM，选择器集中在 `src/ui/file-tree-tooltip.ts`；Obsidian 更新后可能需要调整。此层通过文档上的事件委托兼容文件树重绘，禁用时清理监听、Tooltip 和尚未完成的读取结果。
 
 ## 本地安装
 
@@ -52,4 +54,4 @@ Copy-Item -LiteralPath main.js, manifest.json, styles.css -Destination $pluginPa
 
 重新加载 Obsidian，在 **设置 → 第三方插件** 中启用 **Descript.ion comments**。更新时重新构建并复制这三个文件，再禁用/启用插件或重新加载应用。
 
-真实应用验收由用户手动执行；步骤及结果记录见 [验收记录](docs/testing/issue-2.md)。自动测试的合成字节样本不能替代真实 TC 双向兼容性验收。
+真实应用验收由用户手动执行；步骤及结果记录见 [编辑验收记录](docs/testing/issue-2.md) 和 [悬浮验收记录](docs/testing/issue-3.md)。自动测试的合成字节样本不能替代真实 TC 双向兼容性验收。

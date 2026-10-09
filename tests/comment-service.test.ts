@@ -66,6 +66,31 @@ async function open(service: CommentService, path = 'a.md') {
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
+void test('悬浮读取父目录备注：外部替换、删除及无法理解的内容在下次打开时生效且不写入', async () => {
+	const storage = new MemoryStorage('目录/附件.png');
+	storage.targets.set('目录/子目录', { identity: {}, revision: 0 });
+	const service = new CommentService(storage);
+	const original = utf8('附件.png 中文\\n**粗体** <b>字面文本</b>\x04\u00C2\r\n子目录 文件夹备注\r\n');
+	storage.files.set('目录/descript.ion', original);
+	assert.equal((await open(service, '目录/附件.png')).comment, '中文\n**粗体** <b>字面文本</b>');
+	assert.equal((await open(service, '目录/子目录')).comment, '文件夹备注');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), original);
+	const changed = utf8('附件.png TC 外部更新\r\n');
+	storage.files.set('目录/descript.ion', changed);
+	assert.equal((await open(service, '目录/附件.png')).comment, 'TC 外部更新');
+	assert.equal((await open(service, '目录/子目录')).comment, '');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), changed);
+	const unknown = utf8('附件.png 不应显示\x04X\r\n');
+	storage.files.set('目录/descript.ion', unknown);
+	const result = await service.open('目录/附件.png');
+	assert.equal(result.status, 'readonly');
+	assert.ok('message' in result && result.message.length > 0);
+	assert.deepEqual(storage.files.get('目录/descript.ion'), unknown);
+	storage.files.delete('目录/descript.ion');
+	assert.equal((await open(service, '目录/附件.png')).comment, '');
+	assert.equal(storage.files.has('目录/descript.ion'), false);
+});
+
 void test('合法 Unicode 行分隔符在备注中保真往返', async () => {
 	const storage = new MemoryStorage('a.md');
 	const service = new CommentService(storage);

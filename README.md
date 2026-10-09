@@ -12,7 +12,9 @@
 
 Vault 根目录和 `descript.ion` 本身不接受备注。文件夹备注写在父目录，不影响文件夹内的备注文件。
 
-在文件资源管理器悬浮笔记、附件或文件夹，查看纯文本备注；中文、换行、Markdown 和 HTML 均按字面内容显示。每次重新悬浮读取实际存储，TC 外部修改后下一次悬浮即可看到最新内容。无备注时不显示备注 Tooltip；读取失败或格式不可理解时显示原因，保持原文件。长备注可在 Tooltip 内滚动查看。
+在文件资源管理器悬浮笔记、附件或文件夹，查看统一悬浮提示：上方为纯文本备注，下方保留 Obsidian 原有提示信息。中文、换行、Markdown 和 HTML 均按字面内容显示。进入条目约 200 毫秒且内容就绪后一次显示；读取较慢时等待完整内容，不先显示再合并。
+
+每次重新悬浮读取实际存储，TC 外部修改后下一次悬浮即可看到最新内容。无备注时恢复官方 Tooltip，允许显示额外晚一个读取耗时；根目录和 `descript.ion` 保持官方行为。读取失败或格式不可理解时，上方显示原因，下方仍保留官方信息，原文件不变。长备注可在 Tooltip 内滚动查看，文件的 Page preview 悬浮事件仍保留。
 
 当前已实现 issue #2 和 #3；状态栏、随移动/重命名/删除维护备注及孤立备注清理属于后续任务。
 
@@ -38,9 +40,9 @@ npm run lint
 npm run build
 ```
 
-`npm run dev` 开启 esbuild 监视。测试用 Node 内建测试运行器与已有 esbuild，唯一主要边界为备注服务公开操作和可替换存储适配器。`.test-build/` 和 `main.js` 为忽略的生成产物。
+`npm run dev` 开启 esbuild 监视。测试用 Node 内建测试运行器与已有 esbuild，主要边界为备注服务公开操作和可替换存储适配器；悬浮重叠修复另通过插件注册入口及模拟的 DOM/Obsidian 边界验证延迟、单次显示、原生恢复与卸载行为。`.test-build/` 和 `main.js` 为忽略的生成产物。
 
-最低 Obsidian 版本为 1.0.0：编辑入口使用公开的 file-menu、Modal、Scope、Vault 和 DataAdapter 二进制 API。悬浮入口依赖文件资源管理器私有 DOM，选择器集中在 `src/ui/file-tree-tooltip.ts`；Obsidian 更新后可能需要调整。此层通过文档上的事件委托兼容文件树重绘，禁用时清理监听、Tooltip 和尚未完成的读取结果。
+最低 Obsidian 版本为 1.8.7，以使用公开的 `displayTooltip`。文件树及当前语言的官方文案接入集中在 `src/ui/file-tree-native-tooltip.ts`，依赖私有结构，已对本机 1.14.4 的程序资源核实；其他版本仍需实际验收，Obsidian 更新后可能需要调整此层。禁用时清理监听、计时器、Tooltip 和尚未完成的读取结果。
 
 ## 本地安装
 
@@ -54,4 +56,4 @@ Copy-Item -LiteralPath main.js, manifest.json, styles.css -Destination $pluginPa
 
 重新加载 Obsidian，在 **设置 → 第三方插件** 中启用 **Descript.ion comments**。更新时重新构建并复制这三个文件，再禁用/启用插件或重新加载应用。
 
-真实应用验收由用户手动执行；步骤及结果记录见 [编辑验收记录](docs/testing/issue-2.md) 和 [悬浮验收记录](docs/testing/issue-3.md)。自动测试的合成字节样本不能替代真实 TC 双向兼容性验收。
+真实应用验收由用户手动执行；步骤及结果记录见 [编辑验收记录](docs/testing/issue-2.md)、[悬浮验收记录](docs/testing/issue-3.md) 和 [统一提示修复验收](docs/testing/unified-file-tree-tooltip.md)。自动测试不能替代真实 Obsidian 交互及 TC 双向兼容性验收。

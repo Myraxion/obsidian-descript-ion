@@ -296,3 +296,63 @@ void test('多行备注保留换行、空格、反斜杠与字面反斜杠-n，�
 	assert.equal(reopened.status, 'ok');
 	if (reopened.status === 'ok') assert.equal(reopened.comment, comment);
 });
+
+void test('活动文件状态栏工作流：同一服务边界验证无备注、添加保存、TC 外部修改与删除后更新', async () => {
+	const storage = new MemoryStorage('活动文件.md');
+	const service = new CommentService(storage);
+
+	// 初始无备注：返回 ok 且备注为空，状态栏据此显示“添加备注”
+	const initial = await service.open('活动文件.md');
+	assert.equal(initial.status, 'ok');
+	if (initial.status !== 'ok') return;
+	assert.equal(initial.comment, '');
+
+	// 点击状态栏打开弹窗并保存备注
+	const saveRes = await service.save(initial.session, '状态栏首次添加的备注\n第二行详情');
+	assert.equal(saveRes.status, 'ok');
+
+	// 弹窗关闭后状态栏重新读取实际存储：得到保存后的多行备注
+	const afterSave = await service.open('活动文件.md');
+	assert.equal(afterSave.status, 'ok');
+	if (afterSave.status !== 'ok') return;
+	assert.equal(afterSave.comment, '状态栏首次添加的备注\n第二行详情');
+
+	// 模拟外部 Total Commander 修改备注
+	storage.files.set('descript.ion', utf8('\uFEFF"活动文件.md" TC 外部修改的最新备注\r\n'));
+
+	// 状态栏交互（悬浮/点击）或活动文件切换重新读取：立即获取 TC 外部修改
+	const external = await service.open('活动文件.md');
+	assert.equal(external.status, 'ok');
+	if (external.status !== 'ok') return;
+	assert.equal(external.comment, 'TC 外部修改的最新备注');
+
+	// 点击状态栏打开弹窗并删除备注
+	const delRes = await service.delete(external.session);
+	assert.equal(delRes.status, 'ok');
+
+	// 弹窗关闭后重新读取：备注清空且备注文件被清理
+	const afterDelete = await service.open('活动文件.md');
+	assert.equal(afterDelete.status, 'ok');
+	if (afterDelete.status !== 'ok') return;
+	assert.equal(afterDelete.comment, '');
+	assert.equal(storage.files.has('descript.ion'), false);
+});
+
+void test('状态栏读取失败时不伪造无备注结果：只读和异常存储准确返回原因', async () => {
+	const storage = new MemoryStorage('只读文件.md');
+	const service = new CommentService(storage);
+
+	// 非 UTF-8 备注文件保护
+	storage.files.set('descript.ion', new Uint8Array([0xff, 0xfe, 0x00, 0x00]));
+	const readonlyResult = await service.open('只读文件.md');
+	assert.equal(readonlyResult.status, 'readonly');
+	assert.match(readonlyResult.message, /不是合法 UTF-8/);
+
+	// 存储异常
+	const brokenStorage = new MemoryStorage('损坏.md');
+	brokenStorage.read = async () => { throw new Error('EACCES'); };
+	const brokenService = new CommentService(brokenStorage);
+	const brokenResult = await brokenService.open('损坏.md');
+	assert.equal(brokenResult.status, 'storage-error');
+	assert.match(brokenResult.message, /无法读写/);
+});

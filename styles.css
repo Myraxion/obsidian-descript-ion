@@ -37,3 +37,19 @@
 .descript-ion-tooltip.descript-ion-message {
 	color: var(--text-error);
 }
+
+.descript-ion-status {
+	cursor: pointer;
+	max-width: 240px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.descript-ion-status.descript-ion-status-error {
+	color: var(--text-error);
+}
+
+.descript-ion-hidden {
+	display: none;
+}

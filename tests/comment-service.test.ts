@@ -1,6 +1,50 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, writeFile, unlink, rmdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { type Plugin } from 'obsidian';
 import { CommentService, type CommentStorage } from '../src/comments/service';
+import { VaultCommentStorage } from '../src/comments/vault-storage';
+
+void test('Windows 隐藏的 TC 备注文件可保存较短备注，保留隐藏属性且无旧内容尾部', { skip: process.platform !== 'win32' }, async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'descript-ion-hidden-'));
+	const path = join(directory, 'descript.ion');
+	try {
+		await writeFile(path, '\uFEFFa.md Total Commander 原有较长备注\r\n');
+		execFileSync('attrib.exe', ['+H', path]);
+		const target = { path: 'a.md' };
+		const adapter = {
+			exists: async (relative: string) => relative === 'a.md' || relative === 'descript.ion',
+			readBinary: async () => {
+				const bytes = await readFile(path);
+				return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+			},
+			writeBinary: async (relative: string, bytes: ArrayBuffer) => writeFile(join(directory, relative), new Uint8Array(bytes)),
+			getFullPath: (relative: string) => join(directory, relative),
+		};
+		const plugin = {
+			app: { vault: { adapter, getAbstractFileByPath: () => target, on: () => ({}) } },
+			registerEvent: () => {},
+			register: () => {},
+		} as unknown as Plugin;
+		const service = new CommentService(new VaultCommentStorage(plugin));
+		const session = (await open(service)).session;
+		const result = await service.save(session, '新备注');
+		assert.equal(result.status, 'ok', JSON.stringify(result));
+		assert.deepEqual(new Uint8Array(await readFile(path)), utf8('\uFEFFa.md 新备注\r\n'));
+		assert.equal((await open(service)).comment, '新备注');
+		assert.match(execFileSync('attrib.exe', [path], { encoding: 'utf8' }), /H\s/);
+		execFileSync('attrib.exe', ['+H', '+R', path]);
+		assert.equal((await service.save((await open(service)).session, '不能写入')).status, 'storage-error');
+		assert.deepEqual(new Uint8Array(await readFile(path)), utf8('\uFEFFa.md 新备注\r\n'));
+	} finally {
+		execFileSync('attrib.exe', ['+H', '-R', path]);
+		await unlink(path);
+		await rmdir(directory);
+	}
+});
 
 class MemoryStorage implements CommentStorage {
 	files = new Map<string, Uint8Array>();

@@ -8,11 +8,13 @@
 
 覆盖中文及空格名称、附件、文件夹父目录、BOM 与行分隔、多行与字面反斜杠、4096 字节边界、增改删、空白删除、末条删除、整文件保护、编辑快照、并发编辑及存储失败。所有测试输入均为合成数据。
 
-2026-10-09：`npm test` 35 项全部通过；`npm run build`（包含严格 TypeScript 检查）、`npm run lint`、`git diff --check` 通过。
+2026-10-09：`npm test` 36 项全部通过；`npm run build`（包含严格 TypeScript 检查）、`npm run lint`、`git diff --check` 通过。
 
 双轴代码审查：Standards 无发现；Spec 发现 Unicode U+2028/U+2029 读取问题，已修复并加入服务边界回归测试。未发现 T1 范围外的功能扩张。
 
 三个构建文件已安装到测试 Vault 的 `.obsidian/plugins/descript-ion/`；未修改插件启用配置。
+
+用户反馈：TC 设置的备注能够读取，但 Obsidian 保存提示无法读写。测试 Vault 的备注文件带 Hidden 属性；Windows 普通覆盖写入可复现 `EPERM`。新增服务公开边界测试，使用真实 Windows 隐藏文件及生产 Vault 存储适配器，修复后确认保存、重新读取、缩短时截断旧尾部、保留隐藏属性及拒绝只读文件。未改写 Vault 中现有备注，修复后真实 UI 保存待用户复验。
 
 ## 用户手动验收（待执行）
 
@@ -33,7 +35,7 @@
 
 - Obsidian 版本：待填写。
 - TC 版本及编码设置：待填写。
-- Obsidian UI 验收：待执行。
+- Obsidian UI 验收：用户确认能读取 TC 备注；首次保存失败，隐藏文件修复后的保存待复验。
 - TC 双向兼容：待执行。
 - 真实 TC 原始字节样本：待提供。
 

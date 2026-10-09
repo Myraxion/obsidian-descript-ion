@@ -1,4 +1,7 @@
-import { type Plugin, type TAbstractFile } from 'obsidian';
+import { type FileSystemAdapter, type Plugin, type TAbstractFile } from 'obsidian';
+import { open } from 'node:fs/promises';
+import { Buffer } from 'node:buffer';
+import { platform } from 'node:process';
 import { type CommentStorage, type TargetState } from './service';
 
 export class VaultCommentStorage implements CommentStorage {
@@ -32,7 +35,20 @@ export class VaultCommentStorage implements CommentStorage {
 	}
 
 	async write(path: string, bytes: Uint8Array): Promise<void> {
-		await this.plugin.app.vault.adapter.writeBinary(path, bytes.slice().buffer);
+		const adapter = this.plugin.app.vault.adapter;
+		try {
+			await adapter.writeBinary(path, bytes.slice().buffer);
+		} catch (error) {
+			if (platform !== 'win32' || typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'EPERM') throw error;
+			// Windows rejects 'w' for existing hidden files. 'r+' preserves TC's attributes.
+			const file = await open((adapter as FileSystemAdapter).getFullPath(path), 'r+');
+			try {
+				await file.writeFile(Buffer.from(bytes));
+				await file.truncate(bytes.length);
+			} finally {
+				await file.close();
+			}
+		}
 	}
 
 	async remove(path: string): Promise<void> {

@@ -2,6 +2,12 @@
 
 任务：[同目录重命名与删除时维护备注](https://github.com/Myraxion/obsidian-descript-ion/issues/5)。
 
+## 完成结果
+
+2026-10-10：用户确认最终实现通过真实应用验收，#5 已关闭。验收环境为 Obsidian 1.14.4、Total Commander 11.58，测试 Vault 为 `D:\Libraries\Obsidian\Demo\`。
+
+针对 Windows 环境下新创建备注文件时未带隐藏属性的问题，已支持在生成及写入 `descript.ion` 时自动设置隐藏属性（`+H`），与 Total Commander 的默认行为完全一致。
+
 ## 交付说明
 
 在 Obsidian 内同目录重命名或删除文件/文件夹后，其父目录中的备注同步更新或删除：

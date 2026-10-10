@@ -31,4 +31,10 @@ export default defineConfig(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		files: ['tests/**'],
+		rules: {
+			'obsidianmd/no-global-this': 'off',
+		},
+	},
 );

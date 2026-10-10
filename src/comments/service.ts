@@ -1,4 +1,17 @@
-import { CommentError, parseDescription, serializeDescription, validName } from './format';
+import { CommentError, type FormatErrorCode, parseDescription, serializeDescription, validName } from './format';
+
+export type ServiceErrorCode =
+	| 'target_not_allowed'
+	| 'target_not_found'
+	| 'storage_io_error'
+	| 'conflict_same_dir'
+	| 'conflict_cross_dir'
+	| 'storage_dest_write_failed'
+	| 'storage_src_clean_failed'
+	| 'stale_target'
+	| 'stale_file';
+
+export type CommentErrorCode = FormatErrorCode | ServiceErrorCode;
 
 export interface TargetState {
 	identity: object;
@@ -23,7 +36,7 @@ export interface EditSession {
 
 export interface Failure {
 	status: 'readonly' | 'limit' | 'invalid-target' | 'invalid-input' | 'stale' | 'storage-error' | 'conflict';
-	message: string;
+	code: CommentErrorCode;
 }
 
 export interface PathSplit {
@@ -46,8 +59,8 @@ export function isCommentTarget(path: string): boolean {
 }
 
 function failure(error: unknown): Failure {
-	if (error instanceof CommentError) return { status: error.status, message: error.message };
-	return { status: 'storage-error', message: '无法读写备注文件，请检查文件权限后重试。' };
+	if (error instanceof CommentError) return { status: error.status, code: error.code };
+	return { status: 'storage-error', code: 'storage_io_error' };
 }
 
 function sameBytes(a: Uint8Array | null, b: Uint8Array | null): boolean {
@@ -60,9 +73,9 @@ export class CommentService {
 
 	async open(path: string): Promise<{ status: 'ok'; comment: string; session: EditSession } | Failure> {
 		try {
-			if (!isCommentTarget(path)) throw new CommentError('invalid-target', '不能为 Vault 根目录或备注文件编辑备注。');
+			if (!isCommentTarget(path)) return { status: 'invalid-target', code: 'target_not_allowed' };
 			const target = await this.storage.target(path);
-			if (!target) throw new CommentError('invalid-target', '备注对象已不存在，请重新打开。');
+			if (!target) return { status: 'invalid-target', code: 'target_not_found' };
 			const { name, descriptionPath } = splitPath(path);
 			const bytes = await this.storage.read(descriptionPath);
 			const entries = parseDescription(bytes);
@@ -137,7 +150,7 @@ export class CommentService {
 		const entries = parseDescription(bytes);
 		if (!entries.has(oldSplit.name)) return { status: 'ok' };
 		if (entries.has(newSplit.name)) {
-			return { status: 'conflict', message: '目标名称已有备注，保留既有记录。' };
+			return { status: 'conflict', code: 'conflict_same_dir' };
 		}
 		const comment = entries.get(oldSplit.name)!;
 		entries.delete(oldSplit.name);
@@ -157,7 +170,7 @@ export class CommentService {
 		const newBytes = await this.storage.read(newSplit.descriptionPath);
 		const newEntries = parseDescription(newBytes);
 		if (newEntries.has(newSplit.name)) {
-			return { status: 'conflict', message: '目标已有同名备注条目，保留源与目标记录。' };
+			return { status: 'conflict', code: 'conflict_cross_dir' };
 		}
 
 		newEntries.set(newSplit.name, comment);
@@ -166,7 +179,7 @@ export class CommentService {
 		try {
 			await this.storage.write(newSplit.descriptionPath, newOutput);
 		} catch {
-			return { status: 'storage-error', message: '无法写入目标备注文件，源备注已保留。' };
+			return { status: 'storage-error', code: 'storage_dest_write_failed' };
 		}
 
 		oldEntries.delete(oldSplit.name);
@@ -178,7 +191,7 @@ export class CommentService {
 				await this.storage.remove(oldSplit.descriptionPath);
 			}
 		} catch {
-			return { status: 'storage-error', message: '目标备注已保存，但清理源备注失败，保留重复记录。' };
+			return { status: 'storage-error', code: 'storage_src_clean_failed' };
 		}
 
 		return { status: 'ok' };
@@ -188,12 +201,12 @@ export class CommentService {
 		try {
 			const target = await this.storage.target(session.path);
 			if (!target || target.identity !== session.target.identity || target.revision !== session.target.revision) {
-				return { status: 'stale', message: '备注对象已移动、重命名或删除。输入已保留，请重新打开对象。' };
+				return { status: 'stale', code: 'stale_target' };
 			}
 			const bytes = await this.storage.read(session.descriptionPath);
 			const entries = parseDescription(bytes);
 			if (!sameBytes(bytes, session.bytes)) {
-				return { status: 'stale', message: '备注文件已改变。输入已保留，请重新打开并核对最新备注。' };
+				return { status: 'stale', code: 'stale_file' };
 			}
 			if (comment.trim()) entries.set(session.name, comment);
 			else entries.delete(session.name);
@@ -201,7 +214,7 @@ export class CommentService {
 			// Recheck after asynchronous reads, immediately before the mutation.
 			const current = await this.storage.target(session.path);
 			if (!current || current.identity !== target.identity || current.revision !== target.revision) {
-				return { status: 'stale', message: '备注对象已改变。输入已保留，请重新打开对象。' };
+				return { status: 'stale', code: 'stale_target' };
 			}
 			if (output) await this.storage.write(session.descriptionPath, output);
 			else if (bytes !== null) await this.storage.remove(session.descriptionPath);

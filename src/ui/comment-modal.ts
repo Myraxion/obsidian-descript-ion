@@ -1,5 +1,6 @@
 import { type App, Modal, Notice, Setting } from 'obsidian';
 import { type CommentService, type EditSession } from '../comments/service';
+import { t } from '../i18n';
 
 export class CommentModal extends Modal {
 	private busy = false;
@@ -14,22 +15,22 @@ export class CommentModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.setTitle('编辑备注');
+		this.setTitle(t('edit_comment'));
 		this.contentEl.createEl('p', { text: this.session.path, cls: 'descript-ion-target' });
-		this.input = this.contentEl.createEl('textarea', { cls: 'descript-ion-input', attr: { 'aria-label': '备注', rows: '8' } });
+		this.input = this.contentEl.createEl('textarea', { cls: 'descript-ion-input', attr: { 'aria-label': t('comment_label'), rows: '8' } });
 		this.input.value = this.comment;
 		this.message = this.contentEl.createEl('p', { cls: 'descript-ion-message', attr: { role: 'status' } });
-		this.contentEl.createEl('p', { text: 'Enter 换行，Ctrl/Cmd+Enter 保存，Escape 取消。', cls: 'setting-item-description' });
+		this.contentEl.createEl('p', { text: t('modal_shortcut_hint'), cls: 'setting-item-description' });
 		new Setting(this.contentEl)
 			.addButton(button => {
-				button.setButtonText('保存').setCta().onClick(() => this.submit(false));
+				button.setButtonText(t('save')).setCta().onClick(() => this.submit(false));
 				this.buttons.push(button.buttonEl);
 			})
 			.addButton(button => {
-				button.setButtonText('删除备注').onClick(() => this.submit(true));
+				button.setButtonText(t('delete_comment')).onClick(() => this.submit(true));
 				this.buttons.push(button.buttonEl);
 			})
-			.addButton(button => button.setButtonText('取消').onClick(() => this.close()));
+			.addButton(button => button.setButtonText(t('cancel')).onClick(() => this.close()));
 		this.input.focus();
 	}
 
@@ -40,10 +41,10 @@ export class CommentModal extends Modal {
 		const result = remove ? await this.service.delete(this.session) : await this.service.save(this.session, this.input.value);
 		this.busy = false;
 		if (result.status === 'ok') {
-			new Notice(remove || !this.input.value.trim() ? '备注已删除' : '备注已保存');
+			new Notice(remove || !this.input.value.trim() ? t('notice_deleted') : t('notice_saved'));
 			this.close();
 		} else {
-			this.message.setText(result.message);
+			this.message.setText(t(result.code));
 			this.blocked = result.status === 'stale' || result.status === 'readonly';
 			if (!this.blocked) this.buttons.forEach(button => button.disabled = false);
 		}

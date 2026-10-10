@@ -91,7 +91,7 @@ class MemoryStorage implements CommentStorage {
 
 async function open(service: CommentService, path = 'a.md') {
 	const result = await service.open(path);
-	if (result.status !== 'ok') throw new Error(result.message);
+	if (result.status !== 'ok') throw new Error(result.code);
 	return result;
 }
 
@@ -115,7 +115,7 @@ void test('悬浮读取父目录备注：外部替换、删除及无法理解的
 	storage.files.set('目录/descript.ion', unknown);
 	const result = await service.open('目录/附件.png');
 	assert.equal(result.status, 'readonly');
-	assert.ok('message' in result && result.message.length > 0);
+	assert.equal(result.code, 'unknown_marker');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), unknown);
 	storage.files.delete('目录/descript.ion');
 	assert.equal((await open(service, '目录/附件.png')).comment, '');
@@ -377,7 +377,7 @@ void test('状态栏读取失败时不伪造无备注结果：只读和异常存
 	storage.files.set('descript.ion', new Uint8Array([0xff, 0xfe, 0x00, 0x00]));
 	const readonlyResult = await service.open('只读文件.md');
 	assert.equal(readonlyResult.status, 'readonly');
-	assert.match(readonlyResult.message, /不是合法 UTF-8/);
+	assert.equal(readonlyResult.code, 'not_utf8');
 
 	// 存储异常
 	const brokenStorage = new MemoryStorage('损坏.md');
@@ -385,7 +385,7 @@ void test('状态栏读取失败时不伪造无备注结果：只读和异常存
 	const brokenService = new CommentService(brokenStorage);
 	const brokenResult = await brokenService.open('损坏.md');
 	assert.equal(brokenResult.status, 'storage-error');
-	assert.match(brokenResult.message, /无法读写/);
+	assert.equal(brokenResult.code, 'storage_io_error');
 });
 
 void test('文件同目录重命名后备注归属于新名称，保留多行格式及空格引号，其他备注不受影响', async () => {
@@ -427,7 +427,7 @@ void test('同目录重命名遇到目标冲突或超过 4096 字节时保留既
 	// 冲突
 	const conflict = await service.rename('目录/旧.md', '目录/已存在.md');
 	assert.equal(conflict.status, 'conflict');
-	assert.match(conflict.message, /目标名称已有|冲突/);
+	assert.equal(conflict.code, 'conflict_same_dir');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), initial);
 
 	// 超限
@@ -437,7 +437,7 @@ void test('同目录重命名遇到目标冲突或超过 4096 字节时保留既
 	// 将 'a' (1 字符) 重命名为 'very_long_name' (14 字符)，长度超过 4096
 	const limitRes = await service.rename('目录/a', '目录/very_long_name');
 	assert.equal(limitRes.status, 'limit');
-	assert.match(limitRes.message, /4096/);
+	assert.equal(limitRes.code, 'record_limit');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), limitInitial);
 });
 
@@ -471,13 +471,13 @@ void test('重命名与删除在遇到非 UTF-8 或异常记录时保持整文�
 	// 只读保护：rename
 	const renameRes = await service.rename('目录/a.md', '目录/b.md');
 	assert.equal(renameRes.status, 'readonly');
-	assert.match(renameRes.message, /未知程序标记|无法修改/);
+	assert.equal(renameRes.code, 'unknown_marker');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), protectedBytes);
 
 	// 只读保护：remove
 	const removeRes = await service.remove('目录/a.md');
 	assert.equal(removeRes.status, 'readonly');
-	assert.match(removeRes.message, /未知程序标记|无法修改/);
+	assert.equal(removeRes.code, 'unknown_marker');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), protectedBytes);
 
 	// 存储写入失败：rename
@@ -516,7 +516,7 @@ void test('descript.ion 元数据文件不作为备注对象迁移，已打开�
 	// 已打开弹窗尝试保存到旧路径：由于旧路径已失效，阻止保存并返回 stale，保留输入
 	const staleSave = await service.save(session, '草稿输入');
 	assert.equal(staleSave.status, 'stale');
-	assert.match(staleSave.message, /已移动、重命名或删除/);
+	assert.equal(staleSave.code, 'stale_target');
 
 	// 新路径可正常打开并读取已维护的备注
 	const reopened = await open(service, '目录/b.md');
@@ -570,7 +570,7 @@ void test('跨目录移动遇目标已有同名备注条目时停止迁移，返
 
 	const result = await service.rename('源目录/冲突.md', '目标目录/冲突.md');
 	assert.equal(result.status, 'conflict');
-	assert.match(result.message, /目标已有同名备注条目|冲突/);
+	assert.equal(result.code, 'conflict_cross_dir');
 
 	// 源和目标备注文件的字节均严格未变
 	assert.deepEqual(storage.files.get('源目录/descript.ion'), sourceInitial);
@@ -593,7 +593,7 @@ void test('跨目录移动两阶段容错：目标写入失败保留源，源清
 
 	const failDest = await service1.rename('源目录/a.md', '目标目录/a.md');
 	assert.equal(failDest.status, 'storage-error');
-	assert.match(failDest.message, /无法写入目标|源备注已保留|无法读写/);
+	assert.equal(failDest.code, 'storage_dest_write_failed');
 	// 源备注文件完好保留，目标未写入
 	assert.deepEqual(storage1.files.get('源目录/descript.ion'), sourceInitial);
 	assert.equal(storage1.files.has('目标目录/descript.ion'), false);
@@ -610,7 +610,7 @@ void test('跨目录移动两阶段容错：目标写入失败保留源，源清
 
 	const failSourceClean = await service2.rename('源目录/a.md', '目标目录/a.md');
 	assert.equal(failSourceClean.status, 'storage-error');
-	assert.match(failSourceClean.message, /目标备注已保存.*清理源备注失败.*保留重复记录/);
+	assert.equal(failSourceClean.code, 'storage_src_clean_failed');
 	// 目标已写入，源也保留（存在重复记录，不丢失备注）
 	assert.deepEqual(storage2.files.get('目标目录/descript.ion'), utf8('\uFEFFa.md 原备注\r\n'));
 	assert.deepEqual(storage2.files.get('源目录/descript.ion'), sourceInitial);
@@ -653,7 +653,7 @@ void test('跨目录移动遇源或目标非 UTF-8/异常记录时只读保护�
 	// 跨目录移动并重命名为较长名称 'very_long_dest_name.md'，导致超过 4096 字节
 	const resLimit = await service3.rename('源目录/a', '目标目录/very_long_dest_name.md');
 	assert.equal(resLimit.status, 'limit');
-	assert.match(resLimit.message, /4096/);
+	assert.equal(resLimit.code, 'record_limit');
 	assert.deepEqual(storage3.files.get('源目录/descript.ion'), limitSource);
 	assert.equal(storage3.files.has('目标目录/descript.ion'), false);
 });
@@ -701,7 +701,7 @@ void test('跨目录直接移动 descript.ion 不迁移记录，已打开弹窗�
 	// 3. 原弹窗尝试保存：阻止保存至旧路径并返回 stale，保留输入
 	const staleSave = await service.save(session, '草稿输入');
 	assert.equal(staleSave.status, 'stale');
-	assert.match(staleSave.message, /已移动、重命名或删除/);
+	assert.equal(staleSave.code, 'stale_target');
 
 	// 4. 新路径可正常打开并读取已维护的备注
 	const reopened = await open(service, '目标目录/笔记.md');

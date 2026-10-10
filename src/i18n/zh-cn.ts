@@ -1,0 +1,32 @@
+export const zhCn = {
+	// UI
+	edit_comment: '编辑备注',
+	add_comment: '添加备注',
+	comment_label: '备注',
+	modal_shortcut_hint: 'Enter 换行，Ctrl/Cmd+Enter 保存，Escape 取消。',
+	save: '保存',
+	delete_comment: '删除备注',
+	cancel: '取消',
+	notice_saved: '备注已保存',
+	notice_deleted: '备注已删除',
+
+	// Error / Failure codes
+	target_not_allowed: '不能为 Vault 根目录或备注文件编辑备注。',
+	target_not_found: '备注对象已不存在，请重新打开。',
+	storage_io_error: '无法读写备注文件，请检查文件权限后重试。',
+	conflict_same_dir: '目标名称已有备注，保留既有记录。',
+	conflict_cross_dir: '目标已有同名备注条目，保留源与目标记录。',
+	storage_dest_write_failed: '无法写入目标备注文件，源备注已保留。',
+	storage_src_clean_failed: '目标备注已保存，但清理源备注失败，保留重复记录。',
+	stale_target: '备注对象已移动、重命名或删除。输入已保留，请重新打开对象。',
+	stale_file: '备注文件已改变。输入已保留，请重新打开并核对最新备注。',
+	not_utf8: '备注文件不是合法 UTF-8，无法修改。',
+	corrupt_line: '备注文件含异常记录，无法修改。',
+	invalid_name: '备注文件含异常名称，无法修改。',
+	duplicate_name: '备注文件含重复名称，无法修改。',
+	unknown_marker: '备注文件含未知程序标记，无法修改。',
+	invalid_escape: '备注文件含异常多行转义，无法修改。',
+	control_character: '备注文件含异常控制字符，无法修改。',
+	unsupported_characters: '备注含不支持的控制字符或 Unicode 字符，请修改输入。',
+	record_limit: '完整备注记录超过 4096 字节，请缩短输入后重试。',
+};

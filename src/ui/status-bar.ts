@@ -1,5 +1,6 @@
 import { type Plugin, Notice } from 'obsidian';
 import { type CommentService, type Failure, isCommentTarget } from '../comments/service';
+import { t } from '../i18n';
 import { CommentModal } from './comment-modal';
 
 export function registerStatusBarComment(plugin: Plugin, service: CommentService): { refresh: () => void } {
@@ -37,13 +38,14 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 				statusBarEl.setText(result.comment);
 				statusBarEl.setAttribute('aria-label', result.comment);
 			} else {
-				statusBarEl.setText('添加备注');
+				statusBarEl.setText(t('add_comment'));
 				statusBarEl.removeAttribute('aria-label');
 			}
 		} else {
 			statusBarEl.addClass('descript-ion-status-error');
-			statusBarEl.setText(result.message);
-			statusBarEl.setAttribute('aria-label', result.message);
+			const msg = t(result.code);
+			statusBarEl.setText(msg);
+			statusBarEl.setAttribute('aria-label', msg);
 		}
 	}
 
@@ -95,7 +97,7 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 
 		render(opened);
 		if (opened.status !== 'ok') {
-			new Notice(opened.message);
+			new Notice(t(opened.code));
 			return;
 		}
 

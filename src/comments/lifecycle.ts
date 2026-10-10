@@ -1,5 +1,6 @@
 import { type Plugin, Notice } from 'obsidian';
 import { type CommentService, type Failure, splitPath } from './service';
+import { t } from '../i18n';
 
 function isDescriptionFile(path: string): boolean {
 	return splitPath(path).name.toLowerCase() === 'descript.ion';
@@ -7,7 +8,7 @@ function isDescriptionFile(path: string): boolean {
 
 function notifyResult(result: { status: 'ok' } | Failure, onChanged?: () => void): void {
 	if (result.status !== 'ok') {
-		new Notice(result.message);
+		new Notice(t(result.code));
 	}
 	onChanged?.();
 }

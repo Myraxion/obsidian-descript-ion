@@ -1,5 +1,6 @@
 import { type Plugin } from 'obsidian';
 import { type CommentService, isCommentTarget } from '../comments/service';
+import { t } from '../i18n';
 
 // File explorer rows have no public hover API. Keep private DOM selectors here.
 function commentRow(target: EventTarget | null): HTMLElement | null {
@@ -38,7 +39,7 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 		const pending = request;
 		const result = await service.open(path);
 		if (!active || pending !== request || !row.isConnected || row.getAttribute('data-path') !== path) return;
-		const text = result.status === 'ok' ? result.comment : result.message;
+		const text = result.status === 'ok' ? result.comment : t(result.code);
 		if (!text) return;
 		tooltip = document.body.createDiv({ cls: 'descript-ion-tooltip', text });
 		tooltip.setAttribute('role', 'tooltip');

@@ -2,7 +2,7 @@
 
 ## 当前进度
 
-2026-10-09：#2 右键编辑与 #3 文件树悬浮备注均已完成并通过用户验收；状态栏、生命周期备注维护和孤立备注清理尚未完成。完整首版范围见[规格](specs/descript-ion.md)，任务状态和依赖见[任务索引](design/descript-ion-tickets.md)。
+2026-10-10：#2 右键编辑、#3 文件树悬浮备注与 #4 状态栏查看及编辑活动文件备注均已完成并通过用户验收；生命周期备注维护和孤立备注清理尚未完成。完整首版范围见[规格](specs/descript-ion.md)，任务状态和依赖见[任务索引](design/descript-ion-tickets.md)。
 
 ## 需求与设计
 
@@ -15,6 +15,7 @@
 
 - [#2 编辑验收](testing/issue-2.md)：格式、编辑保护和 Windows 隐藏文件保存。
 - [#3 悬浮验收](testing/issue-3.md)：最新存储读取、最终 Tooltip 行为和应用版本。
+- [#4 状态栏验收](testing/issue-4.md)：活动文件备注显示、截断悬浮、点击编辑、外部读取感知与平滑更新。
 - [ADR 0001](adr/0001-utf8-tc-compatible-writes.md)：仅修改可完整理解的 UTF-8 备注文件。
 - [ADR 0002](adr/0002-comment-move-failures.md)：迁移失败时保留记录并提示。
 

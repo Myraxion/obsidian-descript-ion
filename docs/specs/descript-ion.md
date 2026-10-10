@@ -1,6 +1,6 @@
 # Descript.ion comments: desktop UTF-8 comment management
 
-Status as of 2026-10-09: context-menu editing (#2) and file explorer comment tooltips (#3) are implemented and accepted. The remaining first-release features are pending; see the [task index](../design/descript-ion-tickets.md). File explorer tooltip behavior reflects the user's later confirmed [position and size decisions](../design/file-tree-tooltip-position.md).
+Status as of 2026-10-10: context-menu editing (#2), file explorer comment tooltips (#3), and active-file comment status bar (#4) are implemented and accepted. The remaining first-release features are pending; see the [task index](../design/descript-ion-tickets.md). File explorer tooltip behavior reflects the user's later confirmed [position and size decisions](../design/file-tree-tooltip-position.md).
 
 ## Problem Statement
 

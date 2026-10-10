@@ -2,7 +2,19 @@ import { type FileSystemAdapter, type Plugin, type TAbstractFile } from 'obsidia
 import { open } from 'node:fs/promises';
 import { Buffer } from 'node:buffer';
 import { platform } from 'node:process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { type CommentStorage, type TargetState } from './service';
+
+const execFileAsync = promisify(execFile);
+
+async function setHiddenAttribute(filePath: string): Promise<void> {
+	try {
+		await execFileAsync('attrib.exe', ['+h', filePath]);
+	} catch {
+		// Non-fatal if setting attributes fails.
+	}
+}
 
 export class VaultCommentStorage implements CommentStorage {
 	private readonly tracked = new Map<TAbstractFile, number>();
@@ -36,8 +48,12 @@ export class VaultCommentStorage implements CommentStorage {
 
 	async write(path: string, bytes: Uint8Array): Promise<void> {
 		const adapter = this.plugin.app.vault.adapter;
+		const isDescriptIon = path.slice(path.lastIndexOf('/') + 1).toLowerCase() === 'descript.ion';
 		try {
 			await adapter.writeBinary(path, bytes.slice().buffer);
+			if (platform === 'win32' && isDescriptIon) {
+				await setHiddenAttribute((adapter as FileSystemAdapter).getFullPath(path));
+			}
 		} catch (error) {
 			if (platform !== 'win32' || typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'EPERM') throw error;
 			// Windows rejects 'w' for existing hidden files. 'r+' preserves TC's attributes.

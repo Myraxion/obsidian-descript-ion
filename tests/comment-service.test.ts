@@ -46,6 +46,37 @@ void test('Windows 隐藏的 TC 备注文件可保存较短备注，保留隐藏
 	}
 });
 
+void test('Windows 下新建生成 descript.ion 时自动设置隐藏属性 (+H)', { skip: process.platform !== 'win32' }, async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'descript-ion-new-hidden-'));
+	const path = join(directory, 'descript.ion');
+	try {
+		const target = { path: 'a.md' };
+		const adapter = {
+			exists: async (relative: string) => relative === 'a.md' || (relative === 'descript.ion' ? await readFile(path).then(() => true, () => false) : false),
+			readBinary: async () => {
+				const bytes = await readFile(path);
+				return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+			},
+			writeBinary: async (relative: string, bytes: ArrayBuffer) => writeFile(join(directory, relative), new Uint8Array(bytes)),
+			getFullPath: (relative: string) => join(directory, relative),
+		};
+		const plugin = {
+			app: { vault: { adapter, getAbstractFileByPath: () => target, on: () => ({}) } },
+			registerEvent: () => {},
+			register: () => {},
+		} as unknown as Plugin;
+		const service = new CommentService(new VaultCommentStorage(plugin));
+		const session = (await open(service)).session;
+		const result = await service.save(session, '新生成的备注');
+		assert.equal(result.status, 'ok', JSON.stringify(result));
+		assert.match(execFileSync('attrib.exe', [path], { encoding: 'utf8' }), /H\s/);
+	} finally {
+		execFileSync('attrib.exe', ['-H', path]);
+		await unlink(path).catch(() => {});
+		await rmdir(directory);
+	}
+});
+
 class MemoryStorage implements CommentStorage {
 	files = new Map<string, Uint8Array>();
 	targets = new Map<string, { identity: object; revision: number }>();

@@ -9,13 +9,13 @@
 | [T3 / #4](https://github.com/Myraxion/obsidian-descript-ion/issues/4) | 状态栏查看与编辑活动文件备注 | #2 | 已完成，验收通过 |
 | [T4 / #5](https://github.com/Myraxion/obsidian-descript-ion/issues/5) | 同目录重命名与删除时维护备注 | #2 | 已完成，验收通过 |
 | [T5 / #6](https://github.com/Myraxion/obsidian-descript-ion/issues/6) | 跨目录迁移备注并处理冲突和失败 | #5 | 已完成，验收通过 |
-| [T6 / #7](https://github.com/Myraxion/obsidian-descript-ion/issues/7) | 清理当前目录孤立备注与空备注文件 | #2 | 待实现，前置已完成 |
-| [T7 / #8](https://github.com/Myraxion/obsidian-descript-ion/issues/8) | 递归清理整库孤立备注与空备注文件 | #7 | 等待 #7 |
+| [T6 / #7](https://github.com/Myraxion/obsidian-descript-ion/issues/7) | 清理当前目录孤立备注与空备注文件 | #2 | 已取消（用户确认不需要，wontfix） |
+| [T7 / #8](https://github.com/Myraxion/obsidian-descript-ion/issues/8) | 递归清理整库孤立备注与空备注文件 | #7 | 已取消（用户确认不需要，wontfix） |
 
 ## 执行规则
 
 - 每个任务包含可实际使用的入口、存储行为和验收；格式、存储和测试基础并入 T1，不作为独立水平任务。
 - 复用已确认的备注服务公开操作测试边界，只断言公开结果、存储字节与文件存在性；真实 Obsidian/TC 验收属于相应任务的验收条件。
-- #2、#3、#4、#5、#6 已完成；后续可选择 #7，#8 等待 #7。
-- 原生阻塞关系是 tracker 中的执行依据；`ready-for-agent` 标签不表示阻塞任务可以提前开始。
-- 已完成任务的证据见 [#2 验收](../testing/issue-2.md)、[#3 验收](../testing/issue-3.md)、[#4 验收](../testing/issue-4.md)、[#5 验收](../testing/issue-5.md) 与 [#6 验收](../testing/issue-6.md)；整体首版尚未完成。
+- #2、#3、#4、#5、#6 已全部完成并通过验收；#7 与 #8 根据用户需求取消（wontfix）。
+- 原生阻塞关系是 tracker 中的执行依据；已关闭/取消任务不再作为阻塞条件。
+- 已完成任务的证据见 [#2 验收](../testing/issue-2.md)、[#3 验收](../testing/issue-3.md)、[#4 验收](../testing/issue-4.md)、[#5 验收](../testing/issue-5.md) 与 [#6 验收](../testing/issue-6.md)；首版范围内任务已全部交付。

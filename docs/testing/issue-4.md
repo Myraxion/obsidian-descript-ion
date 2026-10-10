@@ -16,7 +16,7 @@
 - **语法与规范**：`npm run lint`（`eslint .` 配合 `eslint-plugin-obsidianmd`）严格检查通过，零错误零警告。
 - **生产构建**：`npm run build` 成功。
 - **测试 Vault 产物部署**：测试 Vault `D:\Libraries\Obsidian\Demo\` 中的 `main.js`、`manifest.json`、`styles.css` 与仓库构建产物 SHA-256 完全一致：
-  - `main.js`: `DB445F39F867F0F8FC3923FD87653CAF3FED84091FBA57059EBD45092368A552`
+  - `main.js`: `ED2917B2FEE40088B37988B78138E09994AD9A806133275F08BC80CF3C5DF1E3`
   - `styles.css`: `EBC4FF87589EA5FA2EEA091467DE00E771DA511A2E65753536A70359FBD999ED`
 
 ## 真实应用手动验收清单

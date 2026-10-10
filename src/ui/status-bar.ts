@@ -4,15 +4,26 @@ import { CommentModal } from './comment-modal';
 
 export function registerStatusBarComment(plugin: Plugin, service: CommentService): void {
 	const { workspace } = plugin.app;
+	const document = workspace.containerEl.ownerDocument;
+	const window = document.defaultView!;
 	const statusBarEl = plugin.addStatusBarItem();
 	statusBarEl.addClass('descript-ion-status', 'descript-ion-hidden');
 
 	const modals = new Set<CommentModal>();
 	let active = true;
 	let requestId = 0;
+	let updateTimer: number | undefined;
+
+	function cancelSchedule(): void {
+		if (updateTimer !== undefined) {
+			window.clearTimeout(updateTimer);
+			updateTimer = undefined;
+		}
+	}
 
 	plugin.register(() => {
 		active = false;
+		cancelSchedule();
 		for (const modal of modals) modal.close();
 		modals.clear();
 		statusBarEl.remove();
@@ -52,16 +63,20 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 
 		const currentRequestId = ++requestId;
 		const targetPath = file.path;
-		// 目标切换时立即清除旧目标文本与提示，避免异步读取期间残留上一目标信息
-		statusBarEl.empty();
-		statusBarEl.removeAttribute('aria-label');
-		statusBarEl.removeClass('descript-ion-status-error');
 
 		const result = await service.open(targetPath);
 		if (!active || currentRequestId !== requestId) return;
 		if (workspace.getActiveFile()?.path !== targetPath) return;
 
 		render(result);
+	}
+
+	function scheduleUpdate(): void {
+		cancelSchedule();
+		updateTimer = window.setTimeout(() => {
+			updateTimer = undefined;
+			void update();
+		}, 20);
 	}
 
 	plugin.registerDomEvent(statusBarEl, 'mouseenter', () => {
@@ -92,8 +107,8 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 		modal.open();
 	});
 
-	plugin.registerEvent(workspace.on('file-open', () => void update()));
-	plugin.registerEvent(workspace.on('active-leaf-change', () => void update()));
+	plugin.registerEvent(workspace.on('file-open', scheduleUpdate));
+	plugin.registerEvent(workspace.on('active-leaf-change', scheduleUpdate));
 
 	void update();
 }

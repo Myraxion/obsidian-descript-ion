@@ -528,3 +528,188 @@ void test('descript.ion 元数据文件不作为备注对象迁移，已打开�
 	const staleSaveDeleted = await service.save(reopened.session, '草稿输入');
 	assert.equal(staleSaveDeleted.status, 'stale');
 });
+
+void test('文件跨目录移动后目标父目录新增对应备注，源目录条目删除，源文件变空后自动删除', async () => {
+	const storage = new MemoryStorage('目标目录/多行 笔记.md');
+	const service = new CommentService(storage);
+
+	// 场景 1：源目录有多条备注，目标目录已有其他备注，文件名含空格保留双引号与多行格式
+	const sourceInitial = utf8('\uFEFF"多行 笔记.md" 多行\\n备注\x04\u00C2\r\n保留.md 保留备注\r\n');
+	const destInitial = utf8('\uFEFF已有.md 既有备注\r\n');
+	storage.files.set('源目录/descript.ion', sourceInitial);
+	storage.files.set('目标目录/descript.ion', destInitial);
+
+	const res1 = await service.rename('源目录/多行 笔记.md', '目标目录/多行 笔记.md');
+	assert.equal(res1.status, 'ok');
+
+	// 目标目录包含原有条目与新增的条目，且引号与格式保真
+	assert.deepEqual(storage.files.get('目标目录/descript.ion'), utf8('\uFEFF已有.md 既有备注\r\n"多行 笔记.md" 多行\\n备注\x04\u00C2\r\n'));
+	// 源目录仅剩下未移动条目
+	assert.deepEqual(storage.files.get('源目录/descript.ion'), utf8('\uFEFF保留.md 保留备注\r\n'));
+	assert.equal((await open(service, '目标目录/多行 笔记.md')).comment, '多行\n备注');
+
+	// 场景 2：移动最后一条备注，源备注文件变空后被自动删除；目标目录原本无备注文件时新建
+	storage.targets.set('空目标/保留.md', { identity: {}, revision: 0 });
+	const res2 = await service.rename('源目录/保留.md', '空目标/保留.md');
+	assert.equal(res2.status, 'ok');
+	// 源目录 descript.ion 变空已删除
+	assert.equal(storage.files.has('源目录/descript.ion'), false);
+	// 空目标目录新建了 descript.ion
+	assert.deepEqual(storage.files.get('空目标/descript.ion'), utf8('\uFEFF保留.md 保留备注\r\n'));
+	assert.equal((await open(service, '空目标/保留.md')).comment, '保留备注');
+});
+
+void test('跨目录移动遇目标已有同名备注条目时停止迁移，返回 conflict 并保留源与目标记录', async () => {
+	const storage = new MemoryStorage('目标目录/冲突.md');
+	const service = new CommentService(storage);
+
+	const sourceInitial = utf8('\uFEFF冲突.md 源备注\r\n其他.md 其他备注\r\n');
+	const destInitial = utf8('\uFEFF冲突.md 目标既有备注\r\n');
+	storage.files.set('源目录/descript.ion', sourceInitial);
+	storage.files.set('目标目录/descript.ion', destInitial);
+
+	const result = await service.rename('源目录/冲突.md', '目标目录/冲突.md');
+	assert.equal(result.status, 'conflict');
+	assert.match(result.message, /目标已有同名备注条目|冲突/);
+
+	// 源和目标备注文件的字节均严格未变
+	assert.deepEqual(storage.files.get('源目录/descript.ion'), sourceInitial);
+	assert.deepEqual(storage.files.get('目标目录/descript.ion'), destInitial);
+});
+
+void test('跨目录移动两阶段容错：目标写入失败保留源，源清理失败保留重复记录并明确报错', async () => {
+	// 子场景 1：目标写入失败保留源
+	const storage1 = new MemoryStorage('目标目录/a.md');
+	const service1 = new CommentService(storage1);
+	const sourceInitial = utf8('\uFEFFa.md 原备注\r\n');
+	storage1.files.set('源目录/descript.ion', sourceInitial);
+
+	// 模拟写入目标路径时报错
+	const originalWrite1 = storage1.write.bind(storage1);
+	storage1.write = async (path, bytes) => {
+		if (path.startsWith('目标目录')) throw new Error('EACCES: permission denied');
+		return originalWrite1(path, bytes);
+	};
+
+	const failDest = await service1.rename('源目录/a.md', '目标目录/a.md');
+	assert.equal(failDest.status, 'storage-error');
+	assert.match(failDest.message, /无法写入目标|源备注已保留|无法读写/);
+	// 源备注文件完好保留，目标未写入
+	assert.deepEqual(storage1.files.get('源目录/descript.ion'), sourceInitial);
+	assert.equal(storage1.files.has('目标目录/descript.ion'), false);
+
+	// 子场景 2：目标写入成功但源清理失败（例如最后一条删除源文件失败），保留重复记录
+	const storage2 = new MemoryStorage('目标目录/a.md');
+	const service2 = new CommentService(storage2);
+	storage2.files.set('源目录/descript.ion', sourceInitial);
+
+	// 模拟清理源文件时报错
+	storage2.remove = async (path) => {
+		if (path.startsWith('源目录')) throw new Error('EBUSY: resource busy');
+	};
+
+	const failSourceClean = await service2.rename('源目录/a.md', '目标目录/a.md');
+	assert.equal(failSourceClean.status, 'storage-error');
+	assert.match(failSourceClean.message, /目标备注已保存.*清理源备注失败.*保留重复记录/);
+	// 目标已写入，源也保留（存在重复记录，不丢失备注）
+	assert.deepEqual(storage2.files.get('目标目录/descript.ion'), utf8('\uFEFFa.md 原备注\r\n'));
+	assert.deepEqual(storage2.files.get('源目录/descript.ion'), sourceInitial);
+});
+
+void test('跨目录移动遇源或目标非 UTF-8/异常记录时只读保护，目标超 4096 字节跳过迁移并保留原记录', async () => {
+	// 子场景 1：源备注文件非法（非 UTF-8）
+	const storage1 = new MemoryStorage('目标目录/a.md');
+	const service1 = new CommentService(storage1);
+	const brokenSource = new Uint8Array([0xff, 0xfe, 0x61, 0x00]);
+	const validDest = utf8('\uFEFFb.md 既有\r\n');
+	storage1.files.set('源目录/descript.ion', brokenSource);
+	storage1.files.set('目标目录/descript.ion', validDest);
+
+	const resSourceBroken = await service1.rename('源目录/a.md', '目标目录/a.md');
+	assert.equal(resSourceBroken.status, 'readonly');
+	assert.deepEqual(storage1.files.get('源目录/descript.ion'), brokenSource);
+	assert.deepEqual(storage1.files.get('目标目录/descript.ion'), validDest);
+
+	// 子场景 2：目标备注文件非法（未知标记）
+	const storage2 = new MemoryStorage('目标目录/a.md');
+	const service2 = new CommentService(storage2);
+	const validSource = utf8('\uFEFFa.md 原备注\r\n');
+	const brokenDest = utf8('b.md 既有\x04UNKNOWN\r\n');
+	storage2.files.set('源目录/descript.ion', validSource);
+	storage2.files.set('目标目录/descript.ion', brokenDest);
+
+	const resDestBroken = await service2.rename('源目录/a.md', '目标目录/a.md');
+	assert.equal(resDestBroken.status, 'readonly');
+	assert.deepEqual(storage2.files.get('源目录/descript.ion'), validSource);
+	assert.deepEqual(storage2.files.get('目标目录/descript.ion'), brokenDest);
+
+	// 子场景 3：目标名称导致序列化单条记录超过 4096 字节
+	const storage3 = new MemoryStorage('目标目录/a');
+	const service3 = new CommentService(storage3);
+	const exact4092 = 'x'.repeat(4092);
+	// 源名称 'a'，备注 4092 字符，单行记录刚好 4096 字节：'a x...x\r\n'
+	const limitSource = utf8(`\uFEFFa ${exact4092}\r\n`);
+	storage3.files.set('源目录/descript.ion', limitSource);
+	// 跨目录移动并重命名为较长名称 'very_long_dest_name.md'，导致超过 4096 字节
+	const resLimit = await service3.rename('源目录/a', '目标目录/very_long_dest_name.md');
+	assert.equal(resLimit.status, 'limit');
+	assert.match(resLimit.message, /4096/);
+	assert.deepEqual(storage3.files.get('源目录/descript.ion'), limitSource);
+	assert.equal(storage3.files.has('目标目录/descript.ion'), false);
+});
+
+void test('文件夹跨目录移动只迁移其在父目录中的备注，内部 descript.ion 的相对条目不被逐个重写', async () => {
+	const storage = new MemoryStorage('目标父目录/新文件夹');
+	const service = new CommentService(storage);
+
+	const parentSourceInitial = utf8('\uFEFF旧文件夹 文件夹备注\r\n');
+	const internalInitial = utf8('\uFEFF内部笔记.md 内部备注\r\n"子 附件.png" 附件备注\r\n');
+	storage.files.set('源父目录/descript.ion', parentSourceInitial);
+	// 文件夹内部的 descript.ion
+	storage.files.set('源父目录/旧文件夹/descript.ion', internalInitial);
+
+	const result = await service.rename('源父目录/旧文件夹', '目标父目录/新文件夹');
+	assert.equal(result.status, 'ok');
+
+	// 目标父目录中新增了文件夹的备注
+	assert.deepEqual(storage.files.get('目标父目录/descript.ion'), utf8('\uFEFF新文件夹 文件夹备注\r\n'));
+	// 源父目录变空已删除
+	assert.equal(storage.files.has('源父目录/descript.ion'), false);
+	// 内部 descript.ion 的内容未被修改或搬迁至目标父目录，相对条目保持原样
+	assert.deepEqual(storage.files.get('源父目录/旧文件夹/descript.ion'), internalInitial);
+});
+
+void test('跨目录直接移动 descript.ion 不迁移记录，已打开弹窗的目标跨目录移动后阻止保存至旧路径', async () => {
+	const storage = new MemoryStorage('源目录/笔记.md');
+	const service = new CommentService(storage);
+	storage.files.set('源目录/descript.ion', utf8('\uFEFF"笔记.md" 原备注\r\n'));
+
+	// 1. descript.ion 本身不作为备注对象迁移或建立条目
+	assert.equal((await service.rename('源目录/descript.ion', '目标目录/descript.ion')).status, 'ok');
+	assert.deepEqual(storage.files.get('源目录/descript.ion'), utf8('\uFEFF"笔记.md" 原备注\r\n'));
+	assert.equal(storage.files.has('目标目录/descript.ion'), false);
+
+	// 2. 打开弹窗会话
+	const session = (await open(service, '源目录/笔记.md')).session;
+
+	// 模拟文件在 Obsidian 中被跨目录移动至目标目录
+	storage.targets.delete('源目录/笔记.md');
+	storage.targets.set('目标目录/笔记.md', { identity: {}, revision: 0 });
+	const moveRes = await service.rename('源目录/笔记.md', '目标目录/笔记.md');
+	assert.equal(moveRes.status, 'ok');
+
+	// 3. 原弹窗尝试保存：阻止保存至旧路径并返回 stale，保留输入
+	const staleSave = await service.save(session, '草稿输入');
+	assert.equal(staleSave.status, 'stale');
+	assert.match(staleSave.message, /已移动、重命名或删除/);
+
+	// 4. 新路径可正常打开并读取已维护的备注
+	const reopened = await open(service, '目标目录/笔记.md');
+	assert.equal(reopened.comment, '原备注');
+});
+
+
+
+
+
+

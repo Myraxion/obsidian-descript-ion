@@ -26,13 +26,6 @@ export function registerCommentLifecycle(
 			return;
 		}
 
-		const oldSplit = splitPath(oldPath);
-		const newSplit = splitPath(newPath);
-		if (oldSplit.parentPath !== newSplit.parentPath) {
-			// Cross-directory moves are handled in issue #6.
-			return;
-		}
-
 		notifyResult(await service.rename(oldPath, newPath), onChanged);
 	}));
 

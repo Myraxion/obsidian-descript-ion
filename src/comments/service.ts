@@ -26,7 +26,13 @@ export interface Failure {
 	message: string;
 }
 
-export function splitPath(path: string): { parentPath: string; name: string; descriptionPath: string } {
+export interface PathSplit {
+	parentPath: string;
+	name: string;
+	descriptionPath: string;
+}
+
+export function splitPath(path: string): PathSplit {
 	const slash = path.lastIndexOf('/');
 	const parentPath = slash === -1 ? '' : path.slice(0, slash);
 	const name = path.slice(slash + 1);
@@ -112,25 +118,70 @@ export class CommentService {
 	private async executeRename(oldPath: string, newPath: string): Promise<{ status: 'ok' } | Failure> {
 		try {
 			if (!isCommentTarget(oldPath) || !isCommentTarget(newPath)) return { status: 'ok' };
+			if (oldPath === newPath) return { status: 'ok' };
 			const oldSplit = splitPath(oldPath);
 			const newSplit = splitPath(newPath);
-			if (oldSplit.parentPath !== newSplit.parentPath || oldSplit.name === newSplit.name) return { status: 'ok' };
-			const bytes = await this.storage.read(oldSplit.descriptionPath);
-			if (bytes === null) return { status: 'ok' };
-			const entries = parseDescription(bytes);
-			if (!entries.has(oldSplit.name)) return { status: 'ok' };
-			if (entries.has(newSplit.name)) {
-				return { status: 'conflict', message: '目标名称已有备注，保留既有记录。' };
+			if (oldSplit.parentPath === newSplit.parentPath) {
+				return await this.executeSameDirectoryRename(oldSplit, newSplit);
 			}
-			const comment = entries.get(oldSplit.name)!;
-			entries.delete(oldSplit.name);
-			entries.set(newSplit.name, comment);
-			const output = serializeDescription(entries);
-			await this.storage.write(oldSplit.descriptionPath, output);
-			return { status: 'ok' };
+			return await this.executeCrossDirectoryMove(oldSplit, newSplit);
 		} catch (error) {
 			return failure(error);
 		}
+	}
+
+	private async executeSameDirectoryRename(oldSplit: PathSplit, newSplit: PathSplit): Promise<{ status: 'ok' } | Failure> {
+		if (oldSplit.name === newSplit.name) return { status: 'ok' };
+		const bytes = await this.storage.read(oldSplit.descriptionPath);
+		if (bytes === null) return { status: 'ok' };
+		const entries = parseDescription(bytes);
+		if (!entries.has(oldSplit.name)) return { status: 'ok' };
+		if (entries.has(newSplit.name)) {
+			return { status: 'conflict', message: '目标名称已有备注，保留既有记录。' };
+		}
+		const comment = entries.get(oldSplit.name)!;
+		entries.delete(oldSplit.name);
+		entries.set(newSplit.name, comment);
+		const output = serializeDescription(entries);
+		await this.storage.write(oldSplit.descriptionPath, output);
+		return { status: 'ok' };
+	}
+
+	private async executeCrossDirectoryMove(oldSplit: PathSplit, newSplit: PathSplit): Promise<{ status: 'ok' } | Failure> {
+		const oldBytes = await this.storage.read(oldSplit.descriptionPath);
+		if (oldBytes === null) return { status: 'ok' };
+		const oldEntries = parseDescription(oldBytes);
+		if (!oldEntries.has(oldSplit.name)) return { status: 'ok' };
+
+		const comment = oldEntries.get(oldSplit.name)!;
+		const newBytes = await this.storage.read(newSplit.descriptionPath);
+		const newEntries = parseDescription(newBytes);
+		if (newEntries.has(newSplit.name)) {
+			return { status: 'conflict', message: '目标已有同名备注条目，保留源与目标记录。' };
+		}
+
+		newEntries.set(newSplit.name, comment);
+		const newOutput = serializeDescription(newEntries);
+
+		try {
+			await this.storage.write(newSplit.descriptionPath, newOutput);
+		} catch {
+			return { status: 'storage-error', message: '无法写入目标备注文件，源备注已保留。' };
+		}
+
+		oldEntries.delete(oldSplit.name);
+		try {
+			if (oldEntries.size > 0) {
+				const oldOutput = serializeDescription(oldEntries);
+				await this.storage.write(oldSplit.descriptionPath, oldOutput);
+			} else {
+				await this.storage.remove(oldSplit.descriptionPath);
+			}
+		} catch {
+			return { status: 'storage-error', message: '目标备注已保存，但清理源备注失败，保留重复记录。' };
+		}
+
+		return { status: 'ok' };
 	}
 
 	private async update(session: EditSession, comment: string): Promise<{ status: 'ok' } | Failure> {

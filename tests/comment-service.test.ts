@@ -356,3 +356,144 @@ void test('状态栏读取失败时不伪造无备注结果：只读和异常存
 	assert.equal(brokenResult.status, 'storage-error');
 	assert.match(brokenResult.message, /无法读写/);
 });
+
+void test('文件同目录重命名后备注归属于新名称，保留多行格式及空格引号，其他备注不受影响', async () => {
+	const storage = new MemoryStorage('目录/新 名称.md');
+	storage.targets.set('目录/other.md', { identity: {}, revision: 0 });
+	const service = new CommentService(storage);
+	const initial = utf8('\uFEFF"旧 笔记.md" 多行\\n备注\x04\u00C2\r\nother.md 保留备注\r\n');
+	storage.files.set('目录/descript.ion', initial);
+
+	const result = await service.rename('目录/旧 笔记.md', '目录/新 名称.md');
+	assert.equal(result.status, 'ok');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), utf8('\uFEFFother.md 保留备注\r\n"新 名称.md" 多行\\n备注\x04\u00C2\r\n'));
+	assert.equal((await open(service, '目录/新 名称.md')).comment, '多行\n备注');
+	assert.equal((await open(service, '目录/other.md')).comment, '保留备注');
+});
+
+void test('文件夹重命名仅维护其在父目录中的备注，内部 descript.ion 的相对条目不被逐个重写', async () => {
+	const storage = new MemoryStorage('父目录/新目录');
+	const service = new CommentService(storage);
+	const parentInitial = utf8('\uFEFF原目录 文件夹备注\r\n');
+	const internalInitial = utf8('\uFEFF内部笔记.md 内部备注\r\n');
+	storage.files.set('父目录/descript.ion', parentInitial);
+	storage.files.set('父目录/原目录/descript.ion', internalInitial);
+
+	const result = await service.rename('父目录/原目录', '父目录/新目录');
+	assert.equal(result.status, 'ok');
+	assert.deepEqual(storage.files.get('父目录/descript.ion'), utf8('\uFEFF新目录 文件夹备注\r\n'));
+	// 内部 descript.ion 的相对条目不被逐个重写，原始字节保持不变
+	assert.deepEqual(storage.files.get('父目录/原目录/descript.ion'), internalInitial);
+	assert.equal(storage.files.has('父目录/新目录/descript.ion'), false);
+});
+
+void test('同目录重命名遇到目标冲突或超过 4096 字节时保留既有与原记录并报告失败', async () => {
+	const storage = new MemoryStorage('目录/旧.md');
+	const service = new CommentService(storage);
+	const initial = utf8('\uFEFF旧.md 原备注\r\n已存在.md 既有备注\r\n');
+	storage.files.set('目录/descript.ion', initial);
+
+	// 冲突
+	const conflict = await service.rename('目录/旧.md', '目录/已存在.md');
+	assert.equal(conflict.status, 'conflict');
+	assert.match(conflict.message, /目标名称已有|冲突/);
+	assert.deepEqual(storage.files.get('目录/descript.ion'), initial);
+
+	// 超限
+	const exact = 'x'.repeat(4090);
+	const limitInitial = utf8(`\uFEFFa ${exact}\r\n`);
+	storage.files.set('目录/descript.ion', limitInitial);
+	// 将 'a' (1 字符) 重命名为 'very_long_name' (14 字符)，长度超过 4096
+	const limitRes = await service.rename('目录/a', '目录/very_long_name');
+	assert.equal(limitRes.status, 'limit');
+	assert.match(limitRes.message, /4096/);
+	assert.deepEqual(storage.files.get('目录/descript.ion'), limitInitial);
+});
+
+void test('删除文件或文件夹后移除父目录对应条目，最后一条删除移除备注文件，不重建已删除目录元数据', async () => {
+	const storage = new MemoryStorage('目录/a.md');
+	const service = new CommentService(storage);
+	storage.files.set('目录/descript.ion', utf8('\uFEFFa.md 一\r\nb.md 二\r\n'));
+
+	// 删除 a.md：移除 a.md 条目，保留 b.md
+	const delFirst = await service.remove('目录/a.md');
+	assert.equal(delFirst.status, 'ok');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), utf8('\uFEFFb.md 二\r\n'));
+
+	// 删除 b.md：最后一条备注删除后，移除该备注文件
+	const delLast = await service.remove('目录/b.md');
+	assert.equal(delLast.status, 'ok');
+	assert.equal(storage.files.has('目录/descript.ion'), false);
+
+	// 删除不存在条目的文件或无备注文件的目录：不重建任何元数据
+	const delNonExistent = await service.remove('已删除目录/子文件.md');
+	assert.equal(delNonExistent.status, 'ok');
+	assert.equal(storage.files.has('已删除目录/descript.ion'), false);
+});
+
+void test('重命名与删除在遇到非 UTF-8 或异常记录时保持整文件只读，存储失败明确报错且字节不变', async () => {
+	const storage = new MemoryStorage('目录/a.md');
+	const service = new CommentService(storage);
+	const protectedBytes = utf8('a.md 说明\x04未知标记\r\n');
+	storage.files.set('目录/descript.ion', protectedBytes);
+
+	// 只读保护：rename
+	const renameRes = await service.rename('目录/a.md', '目录/b.md');
+	assert.equal(renameRes.status, 'readonly');
+	assert.match(renameRes.message, /未知程序标记|无法修改/);
+	assert.deepEqual(storage.files.get('目录/descript.ion'), protectedBytes);
+
+	// 只读保护：remove
+	const removeRes = await service.remove('目录/a.md');
+	assert.equal(removeRes.status, 'readonly');
+	assert.match(removeRes.message, /未知程序标记|无法修改/);
+	assert.deepEqual(storage.files.get('目录/descript.ion'), protectedBytes);
+
+	// 存储写入失败：rename
+	const normalInitial = utf8('\uFEFFa.md 原备注\r\n');
+	storage.files.set('目录/descript.ion', normalInitial);
+	storage.write = async () => { throw new Error('EACCES'); };
+	const failRename = await service.rename('目录/a.md', '目录/b.md');
+	assert.equal(failRename.status, 'storage-error');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), normalInitial);
+
+	// 存储删除失败：remove 最后一条
+	storage.remove = async () => { throw new Error('EPERM'); };
+	const failRemove = await service.remove('目录/a.md');
+	assert.equal(failRemove.status, 'storage-error');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), normalInitial);
+});
+
+void test('descript.ion 元数据文件不作为备注对象迁移，已打开弹窗的目标在重命名或删除后阻止保存至旧路径', async () => {
+	const storage = new MemoryStorage('目录/a.md');
+	const service = new CommentService(storage);
+	storage.files.set('目录/descript.ion', utf8('\uFEFFa.md 原备注\r\n'));
+
+	// descript.ion 本身不作为备注对象迁移或建立条目
+	assert.equal((await service.rename('目录/descript.ion', '目录/descript.ion.bak')).status, 'ok');
+	assert.equal((await service.remove('目录/descript.ion')).status, 'ok');
+	assert.deepEqual(storage.files.get('目录/descript.ion'), utf8('\uFEFFa.md 原备注\r\n'));
+
+	// 打开 a.md 弹窗会话
+	const session = (await open(service, '目录/a.md')).session;
+
+	// a.md 在 Obsidian 中被同目录重命名为 b.md，生命周期完成备注维护
+	storage.targets.delete('目录/a.md');
+	storage.targets.set('目录/b.md', { identity: {}, revision: 0 });
+	assert.equal((await service.rename('目录/a.md', '目录/b.md')).status, 'ok');
+
+	// 已打开弹窗尝试保存到旧路径：由于旧路径已失效，阻止保存并返回 stale，保留输入
+	const staleSave = await service.save(session, '草稿输入');
+	assert.equal(staleSave.status, 'stale');
+	assert.match(staleSave.message, /已移动、重命名或删除/);
+
+	// 新路径可正常打开并读取已维护的备注
+	const reopened = await open(service, '目录/b.md');
+	assert.equal(reopened.comment, '原备注');
+
+	// b.md 被删除，会话尝试保存同样被拦截
+	storage.targets.delete('目录/b.md');
+	assert.equal((await service.remove('目录/b.md')).status, 'ok');
+	const staleSaveDeleted = await service.save(reopened.session, '草稿输入');
+	assert.equal(staleSaveDeleted.status, 'stale');
+});

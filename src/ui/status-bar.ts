@@ -2,7 +2,7 @@ import { type Plugin, Notice } from 'obsidian';
 import { type CommentService, type Failure, isCommentTarget } from '../comments/service';
 import { CommentModal } from './comment-modal';
 
-export function registerStatusBarComment(plugin: Plugin, service: CommentService): void {
+export function registerStatusBarComment(plugin: Plugin, service: CommentService): { refresh: () => void } {
 	const { workspace } = plugin.app;
 	const document = workspace.containerEl.ownerDocument;
 	const window = document.defaultView!;
@@ -111,4 +111,5 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 	plugin.registerEvent(workspace.on('active-leaf-change', scheduleUpdate));
 
 	void update();
+	return { refresh: scheduleUpdate };
 }

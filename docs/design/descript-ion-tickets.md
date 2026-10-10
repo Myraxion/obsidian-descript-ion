@@ -7,7 +7,7 @@
 | [T1 / #2](https://github.com/Myraxion/obsidian-descript-ion/issues/2) | 右键编辑 UTF-8 文件备注，包含 TC 格式与编辑保护 | 无 | 已完成，验收通过 |
 | [T2 / #3](https://github.com/Myraxion/obsidian-descript-ion/issues/3) | 文件列表悬浮显示最新备注 | #2 | 已完成，验收通过 |
 | [T3 / #4](https://github.com/Myraxion/obsidian-descript-ion/issues/4) | 状态栏查看与编辑活动文件备注 | #2 | 已完成，验收通过 |
-| [T4 / #5](https://github.com/Myraxion/obsidian-descript-ion/issues/5) | 同目录重命名与删除时维护备注 | #2 | 待实现，前置已完成 |
+| [T4 / #5](https://github.com/Myraxion/obsidian-descript-ion/issues/5) | 同目录重命名与删除时维护备注 | #2 | 已实现，待手动验收 |
 | [T5 / #6](https://github.com/Myraxion/obsidian-descript-ion/issues/6) | 跨目录迁移备注并处理冲突和失败 | #5 | 等待 #5 |
 | [T6 / #7](https://github.com/Myraxion/obsidian-descript-ion/issues/7) | 清理当前目录孤立备注与空备注文件 | #2 | 待实现，前置已完成 |
 | [T7 / #8](https://github.com/Myraxion/obsidian-descript-ion/issues/8) | 递归清理整库孤立备注与空备注文件 | #7 | 等待 #7 |

@@ -25,13 +25,28 @@
 	pointer-events: none;
 	padding: 8px 12px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-s);
+	border-radius: var(--radius-m);
 	background: var(--background-primary);
 	color: var(--text-normal);
-	box-shadow: var(--shadow-s);
+	line-height: var(--line-height-normal, 1.5);
+	box-shadow: var(--shadow-l);
 	font-size: var(--font-ui-small);
 	white-space: pre-wrap;
-	overflow-wrap: anywhere;
+	overflow-wrap: break-word;
+	word-break: break-word;
+}
+
+.descript-ion-tooltip.is-overflowing::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 28px;
+	pointer-events: none;
+	border-bottom-left-radius: inherit;
+	border-bottom-right-radius: inherit;
+	background: linear-gradient(to bottom, transparent, var(--background-primary));
 }
 
 .descript-ion-tooltip.descript-ion-message {

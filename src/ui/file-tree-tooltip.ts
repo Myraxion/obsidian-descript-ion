@@ -55,6 +55,9 @@ export function registerFileTreeTooltip(plugin: Plugin, service: CommentService)
 		const left = Math.max(8, Math.min(labelLeft, window.innerWidth - tooltip.offsetWidth - 8));
 		const top = placeBelow ? bounds.bottom + 8 : Math.max(8, bounds.top - 8 - tooltip.offsetHeight);
 		tooltip.setCssProps({ '--descript-ion-left': `${left}px`, '--descript-ion-top': `${top}px` });
+		if (tooltip.scrollHeight - tooltip.clientHeight > 1) {
+			tooltip.addClass('is-overflowing');
+		}
 	}
 
 	plugin.registerDomEvent(document, 'mouseover', event => {

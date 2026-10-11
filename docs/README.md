@@ -27,4 +27,4 @@
 - [Triage labels](agents/triage-labels.md)
 - [Domain docs](agents/domain.md)
 
-安装与使用见[项目 README](../README.md)，领域术语见[词汇表](../GLOSSARY.md)。
+安装与使用见[项目 README](../README.md)（[中文](../README_zh.md)），领域术语见[词汇表](../GLOSSARY.md)。

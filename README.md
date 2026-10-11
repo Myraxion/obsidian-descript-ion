@@ -1,65 +1,122 @@
 # Descript.ion comments
 
-为 Obsidian 桌面端 Vault 内的笔记、附件和文件夹查看、编辑兼容 Total Commander 的 UTF-8 备注。数据仅保存在对象父目录的 `descript.ion` 中，不修改笔记正文，无网络请求或遥测。
+English | [简体中文](README_zh.md)
 
-## 使用
+Add **file and folder comments** to Obsidian.
 
-在文件资源管理器右键文件或文件夹，选择 **编辑备注**。弹窗使用纯文本多行输入，不渲染 Markdown 或 HTML。
+All comments are stored in `descript.ion` files in the corresponding directory—a plain-text annotation standard widely adopted by file managers (such as Total Commander). Runs 100% locally with zero network requests, enabling seamless two-way interoperability between Obsidian and external file managers.
 
-- **保存**：新增或修改备注；空或全空白输入删除备注，其他输入保留空格和换行。
-- **删除备注**：删除当前条目；最后一条删除后移除备注文件。
-- **取消** 或 Escape：关闭弹窗；Enter 换行，Ctrl/Cmd+Enter 保存。
+---
 
-Vault 根目录和 `descript.ion` 本身不接受备注。文件夹备注写在父目录，不影响文件夹内的备注文件。
+## ✨ Features
 
-在文件资源管理器悬浮笔记、附件或文件夹，查看纯文本备注；中文、换行、Markdown 和 HTML 均按字面内容显示。每次重新悬浮读取实际存储，TC 外部修改后下一次悬浮即可看到最新内容。无备注时不显示备注 Tooltip；读取失败或格式不可理解时显示原因，保持原文件。Tooltip 超出高度的内容直接裁切，可通过右键 **编辑备注** 查看全文。
+- 📝 **Easy Editing**: Right-click any file, attachment, or folder in the File Explorer to quickly add, edit, or delete comments; supports multiline input.
+- 👁️ **Hover Preview**: Hover over any item in the File Explorer to view comments instantly in a lightweight tooltip without opening the file.
+- 📌 **Status Bar Integration**: Real-time display of the active note's comment in the bottom status bar; hover to view full multiline comments, click to open the edit modal directly.
+- 🔄 **Automatic Lifecycle Sync**: Automatically renames, deletes, and migrates comments when files or folders are renamed, deleted, or moved across directories in Obsidian.
+- 🛡️ **Non-intrusive**: Never touches or pollutes your Markdown note content; fully functional even outside of Obsidian.
 
-备注 Tooltip 与文件名文字的左边缘对齐，默认显示在条目下方并留 8px 间距，空间不足时翻到上方；最大宽度 320px、最大高度 160px，窗口空间较小时进一步缩小。提示不接收鼠标交互，离开条目后约 150ms 关闭；移入提示不会延长显示，切换条目立即清除旧提示。官方时间提示保持现状，此位置调整降低重叠概率，不保证所有场景都无重叠。
+---
 
-在状态栏查看当前活动文件的备注，长备注单行省略截断，悬浮查看完整纯文本与多行内容；无备注时显示“添加备注”。点击状态栏打开编辑弹窗，保存或删除后即时更新。无活动文件或非备注对象时自动隐藏。悬浮移入或点击均重新读取实际存储，感知外部 TC 修改。
+## 📖 User Guide
 
-在 Obsidian 中移动、重命名或删除文件与文件夹时，插件会自动同步维护对应父目录 `descript.ion` 中的备注条目。删除文件或文件夹时同步移除对应备注，最后一条备注删除后自动移除空的备注文件；同目录重命名时自动更新备注关联；跨目录移动时将备注迁移至目标目录。遇到目标冲突或写入失败时安全保留记录并明确报错，避免静默丢失。
+### 1. Editing & Deleting Comments
+- **Open Editor**:
+  - In the File Explorer, **right-click** any file or folder and select **Edit comment**.
+  - Or directly **click the comment area in the status bar** (displays **Add comment** when no comment exists).
+- **Keyboard Shortcuts**:
+  - `Enter`: Insert new lines for multiline text.
+  - `Ctrl` / `Cmd` + `Enter`: Save comment.
+  - `Escape`: Cancel and close the modal.
+- **Delete Comment**:
+  - Click the **Delete comment** button in the bottom-left corner of the modal;
+  - Or clear the input content (empty or whitespace-only) and click Save.
 
-当前首版规划的核心功能（issue #2、#3、#4、#5、#6）已全部实现并通过验收；孤立备注清理功能经确认当前不需要（取消 / wontfix）。
+### 2. Hover to View Comments
+- Hover over any note, attachment, image, or folder name in the File Explorer to display a comment preview tooltip beneath it.
+- Tooltips display literal raw text (fully preserving newlines and spaces) and close automatically ~150ms after the mouse leaves.
+- If an external program (e.g., Total Commander) updates comments, the latest content is reflected immediately on the next hover.
 
-完整规格、任务进度和验收记录见[文档索引](docs/README.md)。
+### 3. Status Bar Integration
+- Opening a note in the editor displays its comment in the bottom status bar.
+- Long comments are automatically truncated in the status bar; hover over the text to view full multiline content.
+- Click the status bar entry anytime to open the edit modal.
+- The status bar item automatically hides when no file is active or when viewing an unsupported object.
 
-## 格式与编辑保护
+### 4. File Lifecycle & Auto-maintenance
+The plugin automatically maintains `descript.ion` consistency in the background:
+- **Rename in same directory**: Automatically updates the comment entry with the new name.
+- **Move across directories**: Automatically migrates the comment from the source directory's `descript.ion` to the destination directory's `descript.ion`.
+- **Delete file/folder**: Automatically removes the corresponding comment entry; if a directory has no comments left, the empty `descript.ion` file is automatically deleted.
 
-读取带/不带 BOM 的合法 UTF-8，以及 CR、LF、CRLF 行分隔。写回统一 UTF-8 BOM 与 CRLF，无开头空行。名称含空白时加双引号。多行备注按 TC 规则转义换行和反斜杠，末尾为 `04 C3 82`；没有 TC 标记时，`\n` 保持字面文字。完整记录含名称、空格、转义、标记和 CRLF 最多 4096 字节，BOM 不计入记录。
+---
 
-非 UTF-8、重复名称、异常记录或未知程序标记会使整个文件不可修改并显示原因，原始字节不变。超限或存储失败时保留弹窗输入，可修改后重试。
+## ⚙️ Format & Compatibility
 
-Windows 下 TC 创建的备注文件可能带隐藏属性。遇到普通覆盖写入返回 `EPERM` 时，插件使用 Node 文件 API 以 `r+` 打开 Vault 内现有备注文件，写入并截断旧尾部，保留隐藏属性；不移除只读属性或更改访问权限。
+- **Storage Specifications**: Standard UTF-8 encoding (with BOM) and CRLF line breaks; file names containing spaces are automatically enclosed in double quotes.
+- **Multiline Escaping**: Complies with Total Commander's multiline escaping format for seamless two-way compatibility with external tools.
+- **Scope**: Comments are supported for regular files and folders inside the vault. The vault root and `descript.ion` files themselves cannot have comments.
+- **Record Limit**: Single complete records (including file name, escaped content, and markers) are supported up to 4096 bytes.
 
-打开和提交时都读取实际存储。编辑期间备注文件改变，或对象被移动、重命名、删除，会暂停保存和删除，保留草稿；请先复制草稿，取消后重新打开对象并核对最新备注。不自动合并，也不提供跨程序文件锁；外部程序恰好在最后检查与写入之间修改仍可能发生竞争。
+---
 
-## 构建与检查
+## 📥 Installation
 
-使用 Node.js 22/24 LTS 和 npm：
+### Method 1: Community Plugins (Recommended)
+*(Available once approved)*
+1. Open Obsidian **Settings** → **Community plugins**.
+2. Turn off "Restricted mode", then click **Browse**.
+3. Search for `Descript.ion comments` and install it.
+4. Once installed, click **Enable**.
 
-```powershell
-npm ci
-npm run typecheck
-npm test
+### Method 2: Manual Installation
+1. Download the latest release assets (`main.js`, `manifest.json`, `styles.css`) from [GitHub Releases](https://github.com/Myraxion/obsidian-descript-ion/releases).
+2. Inside your Obsidian vault, navigate to or create the plugin directory:
+   `<Vault>/.obsidian/plugins/descript-ion/`
+3. Copy the downloaded `main.js`, `manifest.json`, and `styles.css` into that directory.
+4. Open Obsidian **Settings** → **Community plugins**, reload and enable **Descript.ion comments**.
+
+---
+
+## ❓ FAQ
+
+<details>
+<summary><b>Why does it say "Description file is not valid UTF-8 and cannot be modified"?</b></summary>
+To ensure complete data safety, the plugin strictly follows the "read-only protection on anomaly" principle. If an existing <code>descript.ion</code> contains ANSI encoding, duplicate entries, corrupted records, or unknown third-party markers, the plugin refuses writes to prevent damaging the original file. We recommend opening the file in an external editor and saving it as UTF-8 before editing again.
+</details>
+
+<details>
+<summary><b>Will hidden descript.ion files on Windows lose their hidden attribute?</b></summary>
+No. The plugin specifically handles hidden comment files created by Total Commander on Windows, preserving the hidden attribute (+H) during writes and updates.
+</details>
+
+<details>
+<summary><b>Will comments be lost if a move or rename fails?</b></summary>
+No. When moving or renaming across directories, if a target conflict or write failure occurs, the plugin safely preserves the source record and displays a clear error notice, preventing silent data loss.
+</details>
+
+---
+
+## 🛠️ Local Development
+
+To run tests or build from source:
+
+```bash
+# Install dependencies
+npm install
+
+# Run code style checks and automated tests
 npm run lint
+npm test
+
+# Build production bundle
 npm run build
 ```
 
-`npm run dev` 开启 esbuild 监视。测试用 Node 内建测试运行器与已有 esbuild，唯一主要边界为备注服务公开操作和可替换存储适配器。`.test-build/` 和 `main.js` 为忽略的生成产物。
+See the [Documentation Index](docs/README.md) for design specifications, architecture decisions, and test records.
 
-最低 Obsidian 版本为 1.0.0：编辑入口使用公开的 file-menu、Modal、Scope、Vault 和 DataAdapter 二进制 API。悬浮入口依赖文件资源管理器私有 DOM，选择器集中在 `src/ui/file-tree-tooltip.ts`；Obsidian 更新后可能需要调整。此层通过文档上的事件委托兼容文件树重绘，禁用时清理监听、Tooltip 和尚未完成的读取结果。
+---
 
-## 本地安装
+## 📄 License
 
-构建后将根目录的 `main.js`、`manifest.json`、`styles.css` 复制到测试 Vault 的 `.obsidian/plugins/descript-ion/`：
-
-```powershell
-$pluginPath = 'D:\Libraries\Obsidian\Demo\.obsidian\plugins\descript-ion'
-New-Item -ItemType Directory -Force -Path $pluginPath
-Copy-Item -LiteralPath main.js, manifest.json, styles.css -Destination $pluginPath
-```
-
-重新加载 Obsidian，在 **设置 → 第三方插件** 中启用 **Descript.ion comments**。更新时重新构建并复制这三个文件，再禁用/启用插件或重新加载应用。
-
-真实应用验收由用户手动执行；步骤及结果记录见 [编辑验收记录](docs/testing/issue-2.md) 和 [悬浮验收记录](docs/testing/issue-3.md)。自动测试的合成字节样本不能替代真实 TC 双向兼容性验收。
+This project is licensed under the [MIT](LICENSE) License.

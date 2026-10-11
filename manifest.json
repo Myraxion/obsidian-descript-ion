@@ -3,7 +3,7 @@
 	"name": "Descript.ion comments",
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
-	"description": "查看和编辑兼容 Total Commander 的本地文件与文件夹备注。",
+	"description": "Add comments and descriptions to notes, files, and folders with instant hover tooltips and status bar display, stored in descript.ion files.",
 	"author": "Myraxion",
 	"isDesktopOnly": true
 }

@@ -46,29 +46,36 @@ export class VaultCommentStorage implements CommentStorage {
 		return await adapter.exists(path) ? new Uint8Array(await adapter.readBinary(path)) : null;
 	}
 
-	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void): Promise<void> {
+	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void | Promise<void>): Promise<void> {
 		const adapter = this.plugin.app.vault.adapter;
 		const filesystem = adapter as FileSystemAdapter;
 		const parent = path.slice(0, path.lastIndexOf('/') + 1);
-		const temporary = `${parent}.descript-ion-${randomUUID()}.tmp`;
+		const parentPath = parent.slice(0, -1);
+		const parentFile = parent ? this.plugin.app.vault.getAbstractFileByPath(parentPath) : null;
+		const directory = parentFile?.path === parentPath ? parentFile : null;
+		const name = path.slice(parent.length);
+		const temporaryName = `.descript-ion-${randomUUID()}.tmp`;
+		const temporary = parent + temporaryName;
 		const fullPath = filesystem.getFullPath(path);
 		const temporaryPath = filesystem.getFullPath(temporary);
+		// The parent object follows directory moves even while staging is awaiting I/O.
+		const locatedPath = (name: string) => filesystem.getFullPath(directory ? `${directory.path}/${name}` : parent + name);
 		let restoreHidden = false;
 		try {
 			// Stage all bytes beside the destination; failed writes never touch the original.
 			await adapter.writeBinary(temporary, bytes.slice().buffer);
-			beforeCommit?.();
+			await beforeCommit?.();
 			if (platform === 'win32' && await adapter.exists(path)) {
 				// Windows also rejects replacing a hidden destination. Leave +R untouched.
 				restoreHidden = true;
 				await execFileAsync('attrib.exe', ['-h', fullPath]);
 			}
-			beforeCommit?.();
+			await beforeCommit?.();
 			await rename(temporaryPath, fullPath);
 			restoreHidden = platform === 'win32';
 		} finally {
-			if (restoreHidden) await setHiddenAttribute(fullPath);
-			await unlink(temporaryPath).catch(() => {});
+			if (restoreHidden) await setHiddenAttribute(locatedPath(name));
+			await unlink(locatedPath(temporaryName)).catch(() => {});
 		}
 	}
 

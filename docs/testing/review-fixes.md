@@ -4,9 +4,9 @@
 
 ## 自动化回归
 
-- `tests/storage-safety.test.ts`：真实文件系统中注入部分写入失败，验证原备注字节、隐藏属性和临时文件清理。
+- `tests/storage-safety.test.ts`：真实文件系统中注入部分写入失败，验证原备注字节、隐藏属性和临时文件清理；暂存后移动目录并停止提交，验证在新路径完成清理和属性恢复。
 - `tests/comment-service.test.ts`：保留 Windows 隐藏文件更新、新建隐藏文件和只读拒写的既有验证；临时目录统一位于生成目录 `.test-build`，避免系统临时目录的沙箱重命名限制。
-- `tests/lifecycle-races.test.ts`：验证源/目标父目录移动时排队任务跟随新路径，读取/写入准备期间移动会明确停止，目录删除后不重建元数据，以及成功保存/删除后通知显示刷新。
+- `tests/lifecycle-races.test.ts`：验证源/目标父目录移动时排队任务跟随新路径，读取/写入准备期间移动会明确停止，目录删除后不重建元数据，编辑暂存期间目标改变时保留旧备注，以及成功保存/删除后通知显示刷新。
 - `tests/target-state.test.ts`：验证删除对象能被垃圾回收，祖先目录重命名后返回原路径仍使旧编辑状态失效，兄弟目录目标不受影响。测试运行器启用 `--expose-gc`。
 
 完整测试使用 `npm test`；单文件可运行 `node scripts/test.mjs tests/lifecycle-races.test.ts`。

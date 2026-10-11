@@ -25,7 +25,7 @@ export interface CommentStorage {
 	target(path: string): Promise<TargetState | null>;
 	read(path: string): Promise<Uint8Array | null>;
 	/** Stage bytes safely, then check before replacing the destination. */
-	write(path: string, bytes: Uint8Array, beforeCommit?: () => void): Promise<void>;
+	write(path: string, bytes: Uint8Array, beforeCommit?: () => void | Promise<void>): Promise<void>;
 	remove(path: string): Promise<void>;
 }
 
@@ -61,7 +61,10 @@ export function isCommentTarget(path: string): boolean {
 	return parts.every(validName) && parts[parts.length - 1]?.toLowerCase() !== 'descript.ion';
 }
 
+class EditTargetChanged extends Error {}
+
 function failure(error: unknown): Failure {
+	if (error instanceof EditTargetChanged) return { status: 'stale', code: 'stale_target' };
 	if (error instanceof MaintenancePathChanged) return { status: 'stale', code: 'lifecycle_changed' };
 	if (error instanceof CommentError) return { status: error.status, code: error.code };
 	return { status: 'storage-error', code: 'storage_io_error' };
@@ -231,12 +234,16 @@ export class CommentService {
 		return { status: 'ok' };
 	}
 
+	private async checkEditTarget(session: EditSession): Promise<void> {
+		const target = await this.storage.target(session.path);
+		if (!target || target.identity !== session.target.identity || target.revision !== session.target.revision) {
+			throw new EditTargetChanged();
+		}
+	}
+
 	private async update(session: EditSession, comment: string): Promise<{ status: 'ok' } | Failure> {
 		try {
-			const target = await this.storage.target(session.path);
-			if (!target || target.identity !== session.target.identity || target.revision !== session.target.revision) {
-				return { status: 'stale', code: 'stale_target' };
-			}
+			await this.checkEditTarget(session);
 			const bytes = await this.storage.read(session.descriptionPath);
 			const entries = parseDescription(bytes);
 			if (!sameBytes(bytes, session.bytes)) {
@@ -246,11 +253,9 @@ export class CommentService {
 			else entries.delete(session.name);
 			const output = entries.size ? serializeDescription(entries) : null;
 			// Recheck after asynchronous reads, immediately before the mutation.
-			const current = await this.storage.target(session.path);
-			if (!current || current.identity !== target.identity || current.revision !== target.revision) {
-				return { status: 'stale', code: 'stale_target' };
-			}
-			if (output) await this.storage.write(session.descriptionPath, output);
+			const beforeCommit = () => this.checkEditTarget(session);
+			await beforeCommit();
+			if (output) await this.storage.write(session.descriptionPath, output, beforeCommit);
 			else if (bytes !== null) await this.storage.remove(session.descriptionPath);
 			return { status: 'ok' };
 		} catch (error) {

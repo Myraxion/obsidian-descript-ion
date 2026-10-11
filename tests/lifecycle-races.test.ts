@@ -9,8 +9,8 @@ class RaceStorage implements CommentStorage {
 	targets = new Map<string, { identity: object; revision: number }>();
 	async target(path: string) { return this.targets.get(path) ?? null; }
 	async read(path: string) { return this.files.get(path)?.slice() ?? null; }
-	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void) {
-		beforeCommit?.();
+	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void | Promise<void>) {
+		await beforeCommit?.();
 		this.files.set(path, bytes.slice());
 	}
 	async remove(path: string) { this.files.delete(path); }
@@ -123,4 +123,30 @@ void test('写入准备期间目录移动，在提交前停止维护并保留源
 	await folder;
 	assert.deepEqual([...storage.files.keys()], ['A/descript.ion']);
 	assert.deepEqual(storage.files.get('A/descript.ion'), original);
+});
+
+void test('编辑保存准备写入期间目标被重命名，提交前返回 stale 且保留旧备注', async () => {
+	const storage = new RaceStorage();
+	storage.targets.set('a.md', { identity: {}, revision: 0 });
+	const original = utf8('a.md 原备注\r\n');
+	storage.files.set('descript.ion', original);
+	let release!: () => void;
+	let entered!: () => void;
+	const gate = new Promise<void>(resolve => { release = resolve; });
+	const began = new Promise<void>(resolve => { entered = resolve; });
+	const write = storage.write.bind(storage);
+	storage.write = async (path, bytes, beforeCommit) => {
+		entered();
+		await gate;
+		await write(path, bytes, beforeCommit);
+	};
+	const service = new CommentService(storage);
+	const opened = await service.open('a.md');
+	if (opened.status !== 'ok') throw new Error(opened.code);
+	const saving = service.save(opened.session, '新草稿');
+	await began;
+	storage.targets.delete('a.md');
+	release();
+	assert.deepEqual(await saving, { status: 'stale', code: 'stale_target' });
+	assert.deepEqual(storage.files.get('descript.ion'), original);
 });

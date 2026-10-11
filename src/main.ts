@@ -8,7 +8,7 @@ import { registerStatusBarComment } from './ui/status-bar';
 
 export default class DescriptIonPlugin extends Plugin {
 	onload(): void {
-		const service = new CommentService(new VaultCommentStorage(this));
+		const service = new CommentService(new VaultCommentStorage(this), () => statusBar.refresh());
 		registerCommentMenu(this, service);
 		registerFileTreeTooltip(this, service);
 		const statusBar = registerStatusBarComment(this, service);

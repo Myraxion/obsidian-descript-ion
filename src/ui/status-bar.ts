@@ -13,6 +13,7 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 	const modals = new Set<CommentModal>();
 	let active = true;
 	let requestId = 0;
+	let editRequestId = 0;
 	let updateTimer: number | undefined;
 
 	function cancelSchedule(): void {
@@ -74,6 +75,7 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 	}
 
 	function scheduleUpdate(): void {
+		if (!active) return;
 		cancelSchedule();
 		updateTimer = window.setTimeout(() => {
 			updateTimer = undefined;
@@ -90,12 +92,13 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 		if (!file || !isCommentTarget(file.path)) return;
 
 		const targetPath = file.path;
+		const currentEditRequestId = ++editRequestId;
 		const currentRequestId = ++requestId;
 		const opened = await service.open(targetPath);
-		if (!active || currentRequestId !== requestId) return;
-		if (workspace.getActiveFile()?.path !== targetPath) return;
+		if (!active || currentEditRequestId !== editRequestId) return;
+		if (workspace.getActiveFile() !== file || file.path !== targetPath) return;
 
-		render(opened);
+		if (currentRequestId === requestId) render(opened);
 		if (opened.status !== 'ok') {
 			new Notice(t(opened.code));
 			return;

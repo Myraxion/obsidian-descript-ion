@@ -87,7 +87,7 @@
 
 <details>
 <summary><b>Windows 下隐藏的 descript.ion 会被解除隐藏吗？</b></summary>
-不会。插件专门针对 Windows 下 Total Commander 生成的隐藏属性备注文件做了兼容处理，写入与更新时会完整保留其隐藏属性（+H）。
+保存完成后仍为隐藏文件（+H）。插件先写入临时文件，再安全替换原文件；Windows 替换期间会暂时清除原文件的隐藏属性，成功或失败后恢复，不会通过原地覆盖破坏旧备注。
 </details>
 
 <details>

@@ -20,6 +20,7 @@ export const zhCn = {
 	storage_src_clean_failed: '目标备注已保存，但清理源备注失败，保留重复记录。',
 	stale_target: '备注对象已移动、重命名或删除。输入已保留，请重新打开对象。',
 	stale_file: '备注文件已改变。输入已保留，请重新打开并核对最新备注。',
+	lifecycle_changed: '同步期间备注文件位置已改变，已停止同步，请检查保留的备注。',
 	not_utf8: '备注文件不是合法 UTF-8，无法修改。',
 	corrupt_line: '备注文件含异常记录，无法修改。',
 	invalid_name: '备注文件含异常名称，无法修改。',

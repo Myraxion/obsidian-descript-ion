@@ -22,6 +22,7 @@ export const en: Record<keyof typeof zhCn, string> = {
 	storage_src_clean_failed: 'Target comment saved, but failed to clean source comment, keeping duplicate record.',
 	stale_target: 'Comment target has been moved, renamed, or deleted. Input preserved, please reopen the object.',
 	stale_file: 'Description file has changed. Input preserved, please reopen and verify the latest comment.',
+	lifecycle_changed: 'Description file location changed during synchronization. Synchronization stopped; please check the retained comments.',
 	not_utf8: 'Description file is not valid UTF-8 and cannot be modified.',
 	corrupt_line: 'Description file contains invalid records and cannot be modified.',
 	invalid_name: 'Description file contains invalid names and cannot be modified.',

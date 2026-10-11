@@ -1,6 +1,6 @@
 import { type FileSystemAdapter, type Plugin, type TAbstractFile } from 'obsidian';
-import { open } from 'node:fs/promises';
-import { Buffer } from 'node:buffer';
+import { rename, unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { platform } from 'node:process';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -17,28 +17,28 @@ async function setHiddenAttribute(filePath: string): Promise<void> {
 }
 
 export class VaultCommentStorage implements CommentStorage {
-	private readonly tracked = new Map<TAbstractFile, number>();
+	private readonly revisions = new WeakMap<TAbstractFile, number>();
+	private revision = 0;
 
 	constructor(private readonly plugin: Plugin) {
 		const vault = plugin.app.vault;
-		plugin.registerEvent(vault.on('rename', (file, oldPath) => this.invalidate(file, oldPath)));
-		plugin.registerEvent(vault.on('delete', file => this.invalidate(file, file.path)));
-		plugin.register(() => this.tracked.clear());
+		plugin.registerEvent(vault.on('rename', file => this.invalidate(file)));
+		plugin.registerEvent(vault.on('delete', file => this.invalidate(file)));
 	}
 
-	private invalidate(file: TAbstractFile, oldPath: string): void {
-		for (const [target, revision] of this.tracked) {
-			if (target === file || target.path.startsWith(oldPath + '/') || target.path.startsWith(file.path + '/')) {
-				this.tracked.set(target, revision + 1);
-			}
-		}
+	private invalidate(file: TAbstractFile): void {
+		this.revisions.set(file, ++this.revision);
 	}
 
 	async target(path: string): Promise<TargetState | null> {
 		const file = this.plugin.app.vault.getAbstractFileByPath(path);
 		if (!file || !await this.plugin.app.vault.adapter.exists(path) || file.path !== path) return null;
-		if (!this.tracked.has(file)) this.tracked.set(file, 0);
-		return { identity: file, revision: this.tracked.get(file)! };
+		let revision = 0;
+		// Ancestor moves invalidate descendants without scanning previously viewed objects.
+		for (let target: TAbstractFile | null = file; target; target = target.parent) {
+			revision = Math.max(revision, this.revisions.get(target) ?? 0);
+		}
+		return { identity: file, revision };
 	}
 
 	async read(path: string): Promise<Uint8Array | null> {
@@ -46,24 +46,29 @@ export class VaultCommentStorage implements CommentStorage {
 		return await adapter.exists(path) ? new Uint8Array(await adapter.readBinary(path)) : null;
 	}
 
-	async write(path: string, bytes: Uint8Array): Promise<void> {
+	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void): Promise<void> {
 		const adapter = this.plugin.app.vault.adapter;
-		const isDescriptIon = path.slice(path.lastIndexOf('/') + 1).toLowerCase() === 'descript.ion';
+		const filesystem = adapter as FileSystemAdapter;
+		const parent = path.slice(0, path.lastIndexOf('/') + 1);
+		const temporary = `${parent}.descript-ion-${randomUUID()}.tmp`;
+		const fullPath = filesystem.getFullPath(path);
+		const temporaryPath = filesystem.getFullPath(temporary);
+		let restoreHidden = false;
 		try {
-			await adapter.writeBinary(path, bytes.slice().buffer);
-			if (platform === 'win32' && isDescriptIon) {
-				await setHiddenAttribute((adapter as FileSystemAdapter).getFullPath(path));
+			// Stage all bytes beside the destination; failed writes never touch the original.
+			await adapter.writeBinary(temporary, bytes.slice().buffer);
+			beforeCommit?.();
+			if (platform === 'win32' && await adapter.exists(path)) {
+				// Windows also rejects replacing a hidden destination. Leave +R untouched.
+				restoreHidden = true;
+				await execFileAsync('attrib.exe', ['-h', fullPath]);
 			}
-		} catch (error) {
-			if (platform !== 'win32' || typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'EPERM') throw error;
-			// Windows rejects 'w' for existing hidden files. 'r+' preserves TC's attributes.
-			const file = await open((adapter as FileSystemAdapter).getFullPath(path), 'r+');
-			try {
-				await file.writeFile(Buffer.from(bytes));
-				await file.truncate(bytes.length);
-			} finally {
-				await file.close();
-			}
+			beforeCommit?.();
+			await rename(temporaryPath, fullPath);
+			restoreHidden = platform === 'win32';
+		} finally {
+			if (restoreHidden) await setHiddenAttribute(fullPath);
+			await unlink(temporaryPath).catch(() => {});
 		}
 	}
 

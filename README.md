@@ -87,7 +87,7 @@ To ensure complete data safety, the plugin strictly follows the "read-only prote
 
 <details>
 <summary><b>Will hidden descript.ion files on Windows lose their hidden attribute?</b></summary>
-No. The plugin specifically handles hidden comment files created by Total Commander on Windows, preserving the hidden attribute (+H) during writes and updates.
+The file remains hidden (+H) after saving. The plugin stages the new bytes in a temporary file before replacing the original. Windows replacement temporarily clears the destination's hidden attribute and restores it on success or failure, protecting the old comments from partial writes.
 </details>
 
 <details>

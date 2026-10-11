@@ -1,4 +1,4 @@
-import { type Plugin, Notice } from 'obsidian';
+import { type Plugin, Notice, TFolder } from 'obsidian';
 import { type CommentService, type Failure, splitPath } from './service';
 import { t } from '../i18n';
 
@@ -22,27 +22,20 @@ export function registerCommentLifecycle(
 
 	plugin.registerEvent(vault.on('rename', async (file, oldPath) => {
 		const newPath = file.path;
-		if (isDescriptionFile(oldPath) || isDescriptionFile(newPath)) {
-			onChanged?.();
-			return;
-		}
-
-		notifyResult(await service.rename(oldPath, newPath), onChanged);
+		notifyResult(await service.rename(oldPath, newPath, file instanceof TFolder), onChanged);
 	}));
 
 	plugin.registerEvent(vault.on('delete', async file => {
 		const path = file.path;
-		if (isDescriptionFile(path)) {
-			onChanged?.();
-			return;
-		}
-
-		notifyResult(await service.remove(path), onChanged);
+		notifyResult(await service.remove(path, file instanceof TFolder), onChanged);
 	}));
 
 	plugin.registerEvent(vault.on('modify', file => {
 		if (isDescriptionFile(file.path)) {
 			onChanged?.();
 		}
+	}));
+	plugin.registerEvent(vault.on('create', file => {
+		if (isDescriptionFile(file.path)) onChanged?.();
 	}));
 }

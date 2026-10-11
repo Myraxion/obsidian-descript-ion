@@ -1,15 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, unlink, rmdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { type Plugin } from 'obsidian';
 import { CommentService, type CommentStorage } from '../src/comments/service';
 import { VaultCommentStorage } from '../src/comments/vault-storage';
 
 void test('Windows 隐藏的 TC 备注文件可保存较短备注，保留隐藏属性且无旧内容尾部', { skip: process.platform !== 'win32' }, async () => {
-	const directory = await mkdtemp(join(tmpdir(), 'descript-ion-hidden-'));
+	const directory = await mkdtemp(resolve('.test-build/descript-ion-hidden-'));
 	const path = join(directory, 'descript.ion');
 	try {
 		await writeFile(path, '\uFEFFa.md Total Commander 原有较长备注\r\n');
@@ -47,7 +46,7 @@ void test('Windows 隐藏的 TC 备注文件可保存较短备注，保留隐藏
 });
 
 void test('Windows 下新建生成 descript.ion 时自动设置隐藏属性 (+H)', { skip: process.platform !== 'win32' }, async () => {
-	const directory = await mkdtemp(join(tmpdir(), 'descript-ion-new-hidden-'));
+	const directory = await mkdtemp(resolve('.test-build/descript-ion-new-hidden-'));
 	const path = join(directory, 'descript.ion');
 	try {
 		const target = { path: 'a.md' };

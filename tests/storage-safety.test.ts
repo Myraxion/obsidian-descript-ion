@@ -72,7 +72,7 @@ void test('暂存后目录移动并停止提交，在新目录清理临时文件
 			registerEvent: () => {}, register: () => {},
 		} as unknown as Plugin;
 		const storage = new VaultCommentStorage(plugin);
-		await assert.rejects(storage.write('A/descript.ion', new TextEncoder().encode('x.md 新备注\r\n'), async () => {
+		await assert.rejects(storage.commit('A/descript.ion', new TextEncoder().encode('x.md 新备注\r\n'), async () => {
 			if (process.platform === 'win32' && /H\s/.test(execFileSync('attrib.exe', [description()], { encoding: 'utf8' }))) return;
 			await rename(join(directory, 'A'), join(directory, 'Z'));
 			folder.path = 'Z';

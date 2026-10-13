@@ -4,8 +4,9 @@ import { mkdtemp, readFile, writeFile, unlink, rmdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { type Plugin } from 'obsidian';
-import { CommentService, type CommentStorage } from '../src/comments/service';
+import { CommentService } from '../src/comments/service';
 import { VaultCommentStorage } from '../src/comments/vault-storage';
+import { MemoryStorage } from './fixtures/memory-storage';
 
 void test('Windows 隐藏的 TC 备注文件可保存较短备注，保留隐藏属性且无旧内容尾部', { skip: process.platform !== 'win32' }, async () => {
 	const directory = await mkdtemp(resolve('.test-build/descript-ion-hidden-'));
@@ -75,18 +76,6 @@ void test('Windows 下新建生成 descript.ion 时自动设置隐藏属性 (+H)
 		await rmdir(directory);
 	}
 });
-
-class MemoryStorage implements CommentStorage {
-	files = new Map<string, Uint8Array>();
-	targets = new Map<string, { identity: object; revision: number }>();
-	constructor(path = '中文 笔记.md') {
-		this.targets.set(path, { identity: {}, revision: 0 });
-	}
-	async target(path: string) { return this.targets.get(path) ?? null; }
-	async read(path: string) { return this.files.get(path)?.slice() ?? null; }
-	async write(path: string, bytes: Uint8Array) { this.files.set(path, bytes.slice()); }
-	async remove(path: string) { this.files.delete(path); }
-}
 
 async function open(service: CommentService, path = 'a.md') {
 	const result = await service.open(path);
@@ -288,12 +277,12 @@ void test('存储读写与删除失败返回可重试的公开结果', async () 
 	const storage = new MemoryStorage('a.md');
 	const service = new CommentService(storage);
 	const session = (await open(service)).session;
-	storage.write = async () => { throw new Error('permission'); };
+	storage.commit = async () => { throw new Error('permission'); };
 	assert.equal((await service.save(session, '草稿')).status, 'storage-error');
 	assert.equal(storage.files.has('descript.ion'), false);
 	storage.files.set('descript.ion', utf8('a.md 原备注\n'));
 	const existing = (await open(service)).session;
-	storage.remove = async () => { throw new Error('permission'); };
+	storage.commit = async () => { throw new Error('permission'); };
 	assert.equal((await service.delete(existing)).status, 'storage-error');
 	assert.deepEqual(storage.files.get('descript.ion'), utf8('a.md 原备注\n'));
 	storage.read = async () => { throw new Error('permission'); };
@@ -301,7 +290,7 @@ void test('存储读写与删除失败返回可重试的公开结果', async () 
 });
 
 void test('用户保存中文备注后重新打开，写出 BOM、引号名称和 CRLF', async () => {
-	const storage = new MemoryStorage();
+	const storage = new MemoryStorage('中文 笔记.md');
 	const service = new CommentService(storage);
 	const opened = await service.open('中文 笔记.md');
 	assert.equal(opened.status, 'ok');
@@ -482,13 +471,13 @@ void test('重命名与删除在遇到非 UTF-8 或异常记录时保持整文�
 	// 存储写入失败：rename
 	const normalInitial = utf8('\uFEFFa.md 原备注\r\n');
 	storage.files.set('目录/descript.ion', normalInitial);
-	storage.write = async () => { throw new Error('EACCES'); };
+	storage.commit = async () => { throw new Error('EACCES'); };
 	const failRename = await service.rename('目录/a.md', '目录/b.md');
 	assert.equal(failRename.status, 'storage-error');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), normalInitial);
 
 	// 存储删除失败：remove 最后一条
-	storage.remove = async () => { throw new Error('EPERM'); };
+	storage.commit = async () => { throw new Error('EPERM'); };
 	const failRemove = await service.remove('目录/a.md');
 	assert.equal(failRemove.status, 'storage-error');
 	assert.deepEqual(storage.files.get('目录/descript.ion'), normalInitial);
@@ -584,10 +573,10 @@ void test('跨目录移动两阶段容错：目标写入失败保留源，源清
 	storage1.files.set('源目录/descript.ion', sourceInitial);
 
 	// 模拟写入目标路径时报错
-	const originalWrite1 = storage1.write.bind(storage1);
-	storage1.write = async (path, bytes) => {
+	const originalCommit1 = storage1.commit.bind(storage1);
+	storage1.commit = async (path, bytes, check) => {
 		if (path.startsWith('目标目录')) throw new Error('EACCES: permission denied');
-		return originalWrite1(path, bytes);
+		return originalCommit1(path, bytes, check);
 	};
 
 	const failDest = await service1.rename('源目录/a.md', '目标目录/a.md');
@@ -603,8 +592,10 @@ void test('跨目录移动两阶段容错：目标写入失败保留源，源清
 	storage2.files.set('源目录/descript.ion', sourceInitial);
 
 	// 模拟清理源文件时报错
-	storage2.remove = async (path) => {
-		if (path.startsWith('源目录')) throw new Error('EBUSY: resource busy');
+	const originalCommit2 = storage2.commit.bind(storage2);
+	storage2.commit = async (path, bytes, check) => {
+		if (path.startsWith('源目录') && bytes === null) throw new Error('EBUSY: resource busy');
+		return originalCommit2(path, bytes, check);
 	};
 
 	const failSourceClean = await service2.rename('源目录/a.md', '目标目录/a.md');

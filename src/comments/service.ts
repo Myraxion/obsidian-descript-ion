@@ -20,13 +20,20 @@ export interface TargetState {
 	revision: number;
 }
 
+export type CommitCheck = () => void | Promise<void>;
+
 /** All paths are relative to the current Vault. null means absent, not unreadable. */
 export interface CommentStorage {
 	target(path: string): Promise<TargetState | null>;
 	read(path: string): Promise<Uint8Array | null>;
-	/** Stage bytes safely, then check before replacing the destination. */
-	write(path: string, bytes: Uint8Array, beforeCommit?: () => void | Promise<void>): Promise<void>;
-	remove(path: string): Promise<void>;
+	/**
+	 * Commit complete description bytes, or delete the file when bytes is null.
+	 * Stage writes safely; after preparation, await check before initiating the mutation.
+	 * Check may run repeatedly and must have no side effects. Propagate its errors unchanged;
+	 * a rejected check leaves original bytes untouched. Clean up preparation on either outcome.
+	 * This does not make the check and mutation atomic or lock out external editors.
+	 */
+	commit(path: string, bytes: Uint8Array | null, check: CommitCheck): Promise<void>;
 }
 
 export interface EditSession {
@@ -149,12 +156,8 @@ export class CommentService {
 			const entries = parseDescription(bytes);
 			if (!entries.has(split.name)) return { status: 'ok' };
 			entries.delete(split.name);
-			if (entries.size > 0) {
-				const output = serializeDescription(entries);
-				await this.storage.write(split.descriptionPath, output, check);
-			} else {
-				await this.storage.remove(split.descriptionPath);
-			}
+			const output = entries.size ? serializeDescription(entries) : null;
+			await this.storage.commit(split.descriptionPath, output, check);
 			return { status: 'ok' };
 		} catch (error) {
 			return failure(error);
@@ -188,7 +191,7 @@ export class CommentService {
 		entries.delete(oldSplit.name);
 		entries.set(newSplit.name, comment);
 		const output = serializeDescription(entries);
-		await this.storage.write(oldSplit.descriptionPath, output, check);
+		await this.storage.commit(oldSplit.descriptionPath, output, check);
 		return { status: 'ok' };
 	}
 
@@ -211,7 +214,7 @@ export class CommentService {
 		const newOutput = serializeDescription(newEntries);
 
 		try {
-			await this.storage.write(newSplit.descriptionPath, newOutput, check);
+			await this.storage.commit(newSplit.descriptionPath, newOutput, check);
 		} catch (error) {
 			if (error instanceof MaintenancePathChanged) throw error;
 			return { status: 'storage-error', code: 'storage_dest_write_failed' };
@@ -220,12 +223,8 @@ export class CommentService {
 		check();
 		oldEntries.delete(oldSplit.name);
 		try {
-			if (oldEntries.size > 0) {
-				const oldOutput = serializeDescription(oldEntries);
-				await this.storage.write(oldSplit.descriptionPath, oldOutput, check);
-			} else {
-				await this.storage.remove(oldSplit.descriptionPath);
-			}
+			const oldOutput = oldEntries.size ? serializeDescription(oldEntries) : null;
+			await this.storage.commit(oldSplit.descriptionPath, oldOutput, check);
 		} catch (error) {
 			if (error instanceof MaintenancePathChanged) throw error;
 			return { status: 'storage-error', code: 'storage_src_clean_failed' };
@@ -255,8 +254,9 @@ export class CommentService {
 			// Recheck after asynchronous reads, immediately before the mutation.
 			const beforeCommit = () => this.checkEditTarget(session);
 			await beforeCommit();
-			if (output) await this.storage.write(session.descriptionPath, output, beforeCommit);
-			else if (bytes !== null) await this.storage.remove(session.descriptionPath);
+			if (output !== null || bytes !== null) {
+				await this.storage.commit(session.descriptionPath, output, beforeCommit);
+			}
 			return { status: 'ok' };
 		} catch (error) {
 			return failure(error);

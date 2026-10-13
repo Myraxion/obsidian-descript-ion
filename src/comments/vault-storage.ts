@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { platform } from 'node:process';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { type CommentStorage, type TargetState } from './service';
+import { type CommentStorage, type CommitCheck, type TargetState } from './service';
 
 const execFileAsync = promisify(execFile);
 
@@ -46,7 +46,17 @@ export class VaultCommentStorage implements CommentStorage {
 		return await adapter.exists(path) ? new Uint8Array(await adapter.readBinary(path)) : null;
 	}
 
-	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void | Promise<void>): Promise<void> {
+	async commit(path: string, bytes: Uint8Array | null, check: CommitCheck): Promise<void> {
+		if (bytes !== null) {
+			await this.write(path, bytes, check);
+		} else {
+			// Check before handing deletion to Vault; its internal async work is outside this seam.
+			await check();
+			await this.plugin.app.vault.adapter.remove(path);
+		}
+	}
+
+	private async write(path: string, bytes: Uint8Array, check: CommitCheck): Promise<void> {
 		const adapter = this.plugin.app.vault.adapter;
 		const filesystem = adapter as FileSystemAdapter;
 		const parent = path.slice(0, path.lastIndexOf('/') + 1);
@@ -64,22 +74,18 @@ export class VaultCommentStorage implements CommentStorage {
 		try {
 			// Stage all bytes beside the destination; failed writes never touch the original.
 			await adapter.writeBinary(temporary, bytes.slice().buffer);
-			await beforeCommit?.();
+			await check();
 			if (platform === 'win32' && await adapter.exists(path)) {
 				// Windows also rejects replacing a hidden destination. Leave +R untouched.
 				restoreHidden = true;
 				await execFileAsync('attrib.exe', ['-h', fullPath]);
 			}
-			await beforeCommit?.();
+			await check();
 			await rename(temporaryPath, fullPath);
 			restoreHidden = platform === 'win32';
 		} finally {
 			if (restoreHidden) await setHiddenAttribute(locatedPath(name));
 			await unlink(locatedPath(temporaryName)).catch(() => {});
 		}
-	}
-
-	async remove(path: string): Promise<void> {
-		await this.plugin.app.vault.adapter.remove(path);
 	}
 }

@@ -1,23 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CommentService, type CommentStorage } from '../src/comments/service';
+import { CommentService } from '../src/comments/service';
+import { MemoryStorage } from './fixtures/memory-storage';
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
-class RaceStorage implements CommentStorage {
-	files = new Map<string, Uint8Array>();
-	targets = new Map<string, { identity: object; revision: number }>();
-	async target(path: string) { return this.targets.get(path) ?? null; }
-	async read(path: string) { return this.files.get(path)?.slice() ?? null; }
-	async write(path: string, bytes: Uint8Array, beforeCommit?: () => void | Promise<void>) {
-		await beforeCommit?.();
-		this.files.set(path, bytes.slice());
-	}
-	async remove(path: string) { this.files.delete(path); }
-}
-
 void test('排队中的文件备注迁移跟随源父目录的后续重命名', async () => {
-	const storage = new RaceStorage();
+	const storage = new MemoryStorage();
 	storage.files.set('descript.ion', utf8('A 文件夹备注\r\n'));
 	storage.files.set('A/descript.ion', utf8('x.md 文件备注\r\n'));
 	storage.targets.set('B/x.md', { identity: {}, revision: 0 });
@@ -35,7 +24,7 @@ void test('排队中的文件备注迁移跟随源父目录的后续重命名', 
 });
 
 void test('维护已开始后源父目录移动，明确报告停止且不重建旧目录备注文件', async () => {
-	const storage = new RaceStorage();
+	const storage = new MemoryStorage();
 	const original = utf8('x.md 文件备注\r\n');
 	storage.files.set('A/descript.ion', original);
 	let release!: () => void;
@@ -62,7 +51,7 @@ void test('维护已开始后源父目录移动，明确报告停止且不重建
 });
 
 void test('排队中的迁移跟随目标父目录移动，并且删除父目录后不重建元数据', async () => {
-	const storage = new RaceStorage();
+	const storage = new MemoryStorage();
 	storage.files.set('A/descript.ion', utf8('x.md 文件备注\r\n'));
 	const service = new CommentService(storage);
 	const moving = service.rename('A/x.md', 'B/x.md');
@@ -79,7 +68,7 @@ void test('排队中的迁移跟随目标父目录移动，并且删除父目录
 });
 
 void test('备注保存与删除成功后通知显示刷新，不依赖 Vault 是否索引备注文件', async () => {
-	const storage = new RaceStorage();
+	const storage = new MemoryStorage();
 	storage.targets.set('a.md', { identity: {}, revision: 0 });
 	let displayed = '';
 	let refresh: Promise<void> = Promise.resolve();
@@ -102,17 +91,17 @@ void test('备注保存与删除成功后通知显示刷新，不依赖 Vault �
 });
 
 void test('写入准备期间目录移动，在提交前停止维护并保留源记录', async () => {
-	const storage = new RaceStorage();
+	const storage = new MemoryStorage();
 	const original = utf8('x.md 文件备注\r\n');
 	storage.files.set('A/descript.ion', original);
 	let release!: () => void;
 	let entered!: () => void;
 	const gate = new Promise<void>(resolve => { release = resolve; });
 	const began = new Promise<void>(resolve => { entered = resolve; });
-	const write = storage.write.bind(storage);
-	storage.write = async (path, bytes, beforeCommit) => {
+	const commit = storage.commit.bind(storage);
+	storage.commit = async (path, bytes, check) => {
 		if (path === 'B/descript.ion') { entered(); await gate; }
-		await write(path, bytes, beforeCommit);
+		await commit(path, bytes, check);
 	};
 	const service = new CommentService(storage);
 	const moving = service.rename('A/x.md', 'B/x.md');
@@ -125,28 +114,59 @@ void test('写入准备期间目录移动，在提交前停止维护并保留源
 	assert.deepEqual(storage.files.get('A/descript.ion'), original);
 });
 
-void test('编辑保存准备写入期间目标被重命名，提交前返回 stale 且保留旧备注', async () => {
-	const storage = new RaceStorage();
-	storage.targets.set('a.md', { identity: {}, revision: 0 });
-	const original = utf8('a.md 原备注\r\n');
-	storage.files.set('descript.ion', original);
-	let release!: () => void;
-	let entered!: () => void;
-	const gate = new Promise<void>(resolve => { release = resolve; });
-	const began = new Promise<void>(resolve => { entered = resolve; });
-	const write = storage.write.bind(storage);
-	storage.write = async (path, bytes, beforeCommit) => {
-		entered();
-		await gate;
-		await write(path, bytes, beforeCommit);
-	};
-	const service = new CommentService(storage);
-	const opened = await service.open('a.md');
-	if (opened.status !== 'ok') throw new Error(opened.code);
-	const saving = service.save(opened.session, '新草稿');
-	await began;
-	storage.targets.delete('a.md');
-	release();
-	assert.deepEqual(await saving, { status: 'stale', code: 'stale_target' });
-	assert.deepEqual(storage.files.get('descript.ion'), original);
-});
+for (const deleting of [false, true]) {
+	void test(`编辑${deleting ? '删除' : '保存'}准备期间目标被重命名，提交前返回 stale 且保留旧备注`, async () => {
+		const storage = new MemoryStorage();
+		storage.targets.set('a.md', { identity: {}, revision: 0 });
+		const original = utf8('a.md 原备注\r\n');
+		storage.files.set('descript.ion', original);
+		let release!: () => void;
+		let entered!: () => void;
+		const gate = new Promise<void>(resolve => { release = resolve; });
+		const began = new Promise<void>(resolve => { entered = resolve; });
+		const commit = storage.commit.bind(storage);
+		storage.commit = async (path, bytes, check) => {
+			entered();
+			await gate;
+			await commit(path, bytes, check);
+		};
+		const service = new CommentService(storage);
+		const opened = await service.open('a.md');
+		if (opened.status !== 'ok') throw new Error(opened.code);
+		const saving = deleting ? service.delete(opened.session) : service.save(opened.session, '新草稿');
+		await began;
+		storage.targets.delete('a.md');
+		release();
+		assert.deepEqual(await saving, { status: 'stale', code: 'stale_target' });
+		assert.deepEqual(storage.files.get('descript.ion'), original);
+	});
+}
+
+for (const moving of [false, true]) {
+	void test(`${moving ? '跨目录迁移清理源记录' : '删除最后条备注'}准备期间源目录移动，停止删除并保留记录`, async () => {
+		const storage = new MemoryStorage();
+		const original = utf8('x.md 文件备注\r\n');
+		storage.files.set('A/descript.ion', original);
+		let release!: () => void;
+		let entered!: () => void;
+		const gate = new Promise<void>(resolve => { release = resolve; });
+		const began = new Promise<void>(resolve => { entered = resolve; });
+		const commit = storage.commit.bind(storage);
+		storage.commit = async (path, bytes, check) => {
+			if (path === 'A/descript.ion' && bytes === null) { entered(); await gate; }
+			await commit(path, bytes, check);
+		};
+		const service = new CommentService(storage);
+		const operation = moving ? service.rename('A/x.md', 'B/x.md') : service.remove('A/x.md');
+		await began;
+		storage.files.set('Z/descript.ion', original);
+		storage.files.delete('A/descript.ion');
+		const folder = service.rename('A', 'Z', true);
+		release();
+		assert.deepEqual(await operation, { status: 'stale', code: 'lifecycle_changed' });
+		await folder;
+		assert.deepEqual(storage.files.get('Z/descript.ion'), original);
+		assert.equal(storage.files.has('A/descript.ion'), false);
+		assert.deepEqual(storage.files.get('B/descript.ion') ?? null, moving ? utf8('\uFEFFx.md 文件备注\r\n') : null);
+	});
+}

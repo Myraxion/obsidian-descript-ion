@@ -27,3 +27,15 @@
 4. Windows 中更新隐藏的备注文件，确认成功后仍为隐藏文件；只读文件拒绝更新且内容保持不变。
 
 写入通过同目录临时文件替换原文件；Windows 替换期间会暂时清除目标的隐藏属性，完成或失败后恢复。跨目录迁移仍按既有 ADR 先写目标再清理源，不承诺跨文件事务。
+
+## 统一备注文件提交契约（2026-10-11）
+
+存储 mutation interface 收拢为 `commit(path, bytes | null, check)`，写入完整字节或删除备注文件都必须等待提交检查。备注操作继续负责格式、编辑快照与目标身份校验，存储 adapter 负责准备和提交；检查异常原样传递，保留既有 stale 与迁移失败的错误分类。
+
+- `tests/fixtures/memory-storage.ts`：普通备注操作测试与竞态测试共用一个 adapter，写入与删除都执行检查。
+- `tests/storage-contract.test.ts`：对内存 adapter 与真实磁盘支持的 Vault adapter 运行同一组契约测试，验证异步检查完成前不修改文件、检查拒绝时原字节保留及原错误传播。
+- `tests/lifecycle-races.test.ts`：新增最后条目编辑删除期间目标变化、维护删除期间源目录移动、跨目录迁移清源删除期间目录移动的回归。清源停止后保留已写目标与源记录，符合 ADR-0002。
+
+自动验证：`npm test` 的 76 项测试通过，`npm run build` 与 `npm run lint` 通过。既有真实磁盘测试继续验证 Windows 隐藏/只读属性、部分写入失败及目录移动后的暂存清理。
+
+删除仍由 Obsidian adapter 的 `remove` 完成，检查发生在调用它之前，不承诺在其内部异步步骤后再次检查。保存开始时的备注文件字节比较保持原范围，不增加暂存后的重读、外部锁或跨文件事务。本次未运行实际 Obsidian/Total Commander 回归。

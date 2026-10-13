@@ -75,7 +75,7 @@ npm run build
     - Optional: `author`, `authorUrl`, `fundingUrl` (string or map)
 - Never change `id` after release. Treat it as stable API.
 - Keep `minAppVersion` accurate when using newer APIs.
-- Canonical requirements are coded here: https://github.com/obsidianmd/obsidian-releases/blob/master/.github/workflows/validate-plugin-entry.yml
+- When preparing a release or directory submission, check the current [submission requirements](https://docs.obsidian.md/community-directory/submission-requirements-for-plugins).
 
 ## Testing
 
@@ -97,11 +97,15 @@ npm run build
 - Bump `version` in `manifest.json` (SemVer) and update `versions.json` to map plugin version → minimum app version.
 - Create a GitHub release whose tag exactly matches `manifest.json`'s `version`. Do not use a leading `v`.
 - Attach `manifest.json`, `main.js`, and `styles.css` (if present) to the release as individual assets.
-- After the initial release, follow the process to add/update your plugin in the community catalog as required.
+- Publish the release before submitting to the directory. This repository's release workflow creates a draft; verify its assets and publish it.
+- For first-time listing, follow the current [submission guide](https://docs.obsidian.md/plugins/releasing/submit-plugin): sign in at [Obsidian Community](https://community.obsidian.md) with an Obsidian account, connect GitHub, then select **Plugins → New plugin** and submit the repository URL and owner.
+- Before submission, ensure the public repository's default branch contains `README.md`, `LICENSE`, and an accurate `manifest.json`. The directory reads the manifest at the default branch's HEAD; its `id` must be unique across published plugins and cannot contain `obsidian`.
+- Address automated review errors by updating the repository and publishing a release with an incremented version. Confirm the directory entry is published and installable before reporting marketplace availability.
+- Submit only the initial version to the directory. After listing, distribute updates through GitHub releases with the matching version tag and assets.
 
 ## Security, privacy, and compliance
 
-Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particular:
+Follow Obsidian's **Developer policies** and **Submission requirements for plugins**. In particular:
 
 - Default to local/offline operation. Only make network requests when essential to the feature.
 - No hidden telemetry. If you collect optional analytics or call third-party services, require explicit opt-in and document clearly in `README.md` and in settings.
@@ -264,8 +268,10 @@ this.registerInterval(
 
 - Obsidian sample plugin: https://github.com/obsidianmd/obsidian-sample-plugin
 - API documentation: https://docs.obsidian.md
-- Developer policies: https://docs.obsidian.md/Developer+policies
-- Plugin guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
+- Developer policies: https://docs.obsidian.md/community-directory/developer-policies
+- Submission requirements for plugins: https://docs.obsidian.md/community-directory/submission-requirements-for-plugins
+- Submit your plugin: https://docs.obsidian.md/plugins/releasing/submit-plugin
+- Community account setup and submission form: https://docs.obsidian.md/community-directory/set-up-and-claim
 - Style guide: https://help.obsidian.md/style-guide
 
 ## Agent skills

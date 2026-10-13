@@ -1,5 +1,8 @@
 import { CommentError, type FormatErrorCode, parseDescription, serializeDescription, validName } from './format';
-import { MaintenancePathChanged, MaintenancePaths } from './maintenance-paths';
+import { CommentMutations, MaintenancePathChanged } from './mutations';
+import { type PathSplit, splitPath } from './paths';
+
+export { type PathSplit, splitPath } from './paths';
 
 export type ServiceErrorCode =
 	| 'target_not_allowed'
@@ -49,20 +52,6 @@ export interface Failure {
 	code: CommentErrorCode;
 }
 
-export interface PathSplit {
-	parentPath: string;
-	name: string;
-	descriptionPath: string;
-}
-
-export function splitPath(path: string): PathSplit {
-	const slash = path.lastIndexOf('/');
-	const parentPath = slash === -1 ? '' : path.slice(0, slash);
-	const name = path.slice(slash + 1);
-	const descriptionPath = slash === -1 ? 'descript.ion' : `${parentPath}/descript.ion`;
-	return { parentPath, name, descriptionPath };
-}
-
 export function isCommentTarget(path: string): boolean {
 	const parts = path.split('/');
 	return parts.every(validName) && parts[parts.length - 1]?.toLowerCase() !== 'descript.ion';
@@ -82,8 +71,7 @@ function sameBytes(a: Uint8Array | null, b: Uint8Array | null): boolean {
 }
 
 export class CommentService {
-	private pending: Promise<unknown> = Promise.resolve();
-	private readonly maintenancePaths = new MaintenancePaths();
+	private readonly mutations = new CommentMutations<{ status: 'ok' } | Failure>(failure);
 	constructor(private readonly storage: CommentStorage, private readonly onChanged?: () => void) {}
 
 	async open(path: string): Promise<{ status: 'ok'; comment: string; session: EditSession } | Failure> {
@@ -101,13 +89,11 @@ export class CommentService {
 	}
 
 	save(session: EditSession, comment: string): Promise<{ status: 'ok' } | Failure> {
-		const operation = this.pending.then(async () => {
+		return this.mutations.enqueueEdit(async () => {
 			const result = await this.update(session, comment);
 			if (result.status === 'ok') this.onChanged?.();
 			return result;
 		});
-		this.pending = operation;
-		return operation;
 	}
 
 	delete(session: EditSession): Promise<{ status: 'ok' } | Failure> {
@@ -115,36 +101,13 @@ export class CommentService {
 	}
 
 	rename(oldPath: string, newPath: string, isDirectory = false): Promise<{ status: 'ok' } | Failure> {
-		if (isDirectory) this.maintenancePaths.relocateDirectory(oldPath, newPath);
-		const oldSplit = splitPath(oldPath);
-		const newSplit = splitPath(newPath);
-		if (oldSplit.name.toLowerCase() === 'descript.ion') this.maintenancePaths.changeDescription(oldPath);
-		if (newSplit.name.toLowerCase() === 'descript.ion') this.maintenancePaths.changeDescription(newPath);
-		return this.maintain([oldSplit, newSplit], check => this.executeRename(oldPath, newPath, oldSplit, newSplit, check));
+		return this.mutations.rename(oldPath, newPath, isDirectory, ({ source, destination, check }) =>
+			this.executeRename(oldPath, newPath, source, destination, check));
 	}
 
 	remove(path: string, isDirectory = false): Promise<{ status: 'ok' } | Failure> {
-		if (isDirectory) this.maintenancePaths.removeDirectory(path);
-		const split = splitPath(path);
-		if (split.name.toLowerCase() === 'descript.ion') this.maintenancePaths.changeDescription(path);
-		return this.maintain([split], check => this.executeRemove(path, split, check));
-	}
-
-	private maintain(locations: PathSplit[], execute: (check: () => void) => Promise<{ status: 'ok' } | Failure>): Promise<{ status: 'ok' } | Failure> {
-		const task = this.maintenancePaths.track(locations);
-		const operation = this.pending.then(async () => {
-			try {
-				task.started = true;
-				task.check();
-				return await execute(task.check);
-			} catch (error) {
-				return failure(error);
-			} finally {
-				this.maintenancePaths.release(task);
-			}
-		});
-		this.pending = operation;
-		return operation;
+		return this.mutations.remove(path, isDirectory, ({ location, check }) =>
+			this.executeRemove(path, location, check));
 	}
 
 	private async executeRemove(path: string, split: PathSplit, check: () => void): Promise<{ status: 'ok' } | Failure> {

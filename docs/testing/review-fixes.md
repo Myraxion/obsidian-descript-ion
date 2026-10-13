@@ -39,3 +39,18 @@
 自动验证：`npm test` 的 76 项测试通过，`npm run build` 与 `npm run lint` 通过。既有真实磁盘测试继续验证 Windows 隐藏/只读属性、部分写入失败及目录移动后的暂存清理。
 
 删除仍由 Obsidian adapter 的 `remove` 完成，检查发生在调用它之前，不承诺在其内部异步步骤后再次检查。保存开始时的备注文件字节比较保持原范围，不增加暂存后的重读、外部锁或跨文件事务。本次未运行实际 Obsidian/Total Commander 回归。
+
+## 集中备注维护任务执行规则（2026-10-13）
+
+`src/comments/mutations.ts` 集中拥有保存、删除与维护的共用修改队列，以及维护任务的登记、开始、失效和释放。具名入口在事件到来时同步影响已有任务，随后登记并排队；执行回调开始时获得只读路径快照与检查函数。`src/comments/paths.ts` 提供共享的只读路径表示，取代调用者和维护逻辑之间的可变路径别名。旧 `maintenance-paths.ts` 的行为并入 mutations module。
+
+`tests/mutation-execution.test.ts` 通过原有备注操作的公开 interface 验证：
+
+- 保存先于维护时，两条备注均保留；维护先于旧会话保存时，保存返回 `stale_file`，不会覆盖维护结果。
+- 保存暂停期间，已排队的维护立即跟随目录移动；普通读取不等待修改队列。
+- 直接移动或删除备注文件会使排队中或已经开始的维护立即失效，不重建旧备注文件。
+- 失效任务和直接备注文件操作完成后，后续有效维护继续执行。
+
+原有 lifecycle races、存储契约与真实文件系统保护测试继续保留。格式规则、通知位置、错误代码、先目标后源的迁移顺序及上一轮提交保障范围保持不变。本次未运行实际 Obsidian/Total Commander 回归。
+
+自动验证：`npm test` 的 83 项测试通过，`npm run build`、`npm run lint` 与 `git diff --check` 通过。

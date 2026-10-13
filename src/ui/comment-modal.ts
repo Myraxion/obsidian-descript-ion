@@ -3,6 +3,7 @@ import { type CommentService, type EditSession } from '../comments/service';
 import { t } from '../i18n';
 
 export class CommentModal extends Modal {
+	private closed = false;
 	private busy = false;
 	private blocked = false;
 	private input!: HTMLTextAreaElement;
@@ -35,13 +36,15 @@ export class CommentModal extends Modal {
 	}
 
 	private async submit(remove: boolean): Promise<void> {
-		if (this.busy || this.blocked) return;
+		if (this.closed || this.busy || this.blocked) return;
 		this.busy = true;
 		this.buttons.forEach(button => button.disabled = true);
-		const result = remove ? await this.service.delete(this.session) : await this.service.save(this.session, this.input.value);
+		const comment = this.input.value;
+		const result = remove ? await this.service.delete(this.session) : await this.service.save(this.session, comment);
+		if (this.closed) return;
 		this.busy = false;
 		if (result.status === 'ok') {
-			new Notice(remove || !this.input.value.trim() ? t('notice_deleted') : t('notice_saved'));
+			new Notice(remove || !comment.trim() ? t('notice_deleted') : t('notice_saved'));
 			this.close();
 		} else {
 			this.message.setText(t(result.code));
@@ -51,6 +54,8 @@ export class CommentModal extends Modal {
 	}
 
 	onClose(): void {
+		if (this.closed) return;
+		this.closed = true;
 		this.contentEl.empty();
 		this.didClose();
 	}

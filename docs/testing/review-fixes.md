@@ -54,3 +54,17 @@
 原有 lifecycle races、存储契约与真实文件系统保护测试继续保留。格式规则、通知位置、错误代码、先目标后源的迁移顺序及上一轮提交保障范围保持不变。本次未运行实际 Obsidian/Total Commander 回归。
 
 自动验证：`npm test` 的 83 项测试通过，`npm run build`、`npm run lint` 与 `git diff --check` 通过。
+
+## 收拢备注编辑器生命周期（2026-10-13）
+
+`src/ui/comment-editor.ts` 统一拥有两个入口的异步打开、有效性检查、读取失败提示、弹窗登记/释放和卸载关闭。右键请求独立完成；状态栏只接受最新的待完成编辑请求，已打开的弹窗可以并存。读取后统一核对原对象与路径，状态栏额外核对活动对象。状态栏显示请求与刷新调度仍独立，显示刷新不会取消编辑打开。
+
+`CommentModal` 标记关闭状态。已发起的保存/删除继续完成，但关闭后不再更新消息、按钮、通知或再次关闭弹窗；成功修改仍通过原有备注操作通知刷新状态栏。成功提示依据本次提交文本；失败保留草稿，过期或只读时阻止再次提交，其余失败可重试。
+
+`tests/editor-lifecycle.test.ts` 与 `tests/editor-submit.test.ts` 新增 29 项持续回归，执行真实注册入口、共享编辑 module 与弹窗按钮/快捷键回调，并使用真实备注操作和既有内存存储 adapter。`tests/fixtures/obsidian-ui.ts` 仅提供受控 Obsidian UI 平台；测试打包时通过 alias 替换运行时 `obsidian`，生产构建仍使用实际 Obsidian。
+
+覆盖显示刷新与打开竞争、两入口请求规则、多弹窗关闭、对象改名/删除/同路径替换、活动对象切换、失败读取、读取期间卸载、取消/Escape/卸载期间保存或删除、关闭后的失败结果、草稿保留与重试，以及提交期间修改输入后的成功提示。既有一次性受控 UI 验证已纳入可重复测试。
+
+自动验证：`npm test` 的 112 项测试通过；`npm run build`（含严格 TypeScript 检查）、`npm run lint`（零错误零警告）与 `git diff --check` 通过。
+
+本次未运行实际 Obsidian/Total Commander 回归。真实应用仍需验证焦点、原生 Escape/Ctrl/Cmd+Enter、弹窗关闭与禁用插件行为；受控 UI adapter 的快捷键回调验证不替代这些验收。

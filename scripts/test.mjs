@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 const testFiles = process.argv.length > 2
 	? process.argv.slice(2)
@@ -15,6 +15,7 @@ await build({
 	bundle: true,
 	platform: 'node',
 	format: 'cjs',
+	alias: { obsidian: resolve('tests/fixtures/obsidian-ui.ts') },
 });
 const result = spawnSync(
 	process.execPath,

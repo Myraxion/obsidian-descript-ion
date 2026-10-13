@@ -1,19 +1,17 @@
-import { type Plugin, Notice } from 'obsidian';
+import { type Plugin } from 'obsidian';
 import { type CommentService, type Failure, isCommentTarget } from '../comments/service';
 import { t } from '../i18n';
-import { CommentModal } from './comment-modal';
+import { type CommentEditor } from './comment-editor';
 
-export function registerStatusBarComment(plugin: Plugin, service: CommentService): { refresh: () => void } {
+export function registerStatusBarComment(plugin: Plugin, service: CommentService, editor: CommentEditor): { refresh: () => void } {
 	const { workspace } = plugin.app;
 	const document = workspace.containerEl.ownerDocument;
 	const window = document.defaultView!;
 	const statusBarEl = plugin.addStatusBarItem();
 	statusBarEl.addClass('descript-ion-status', 'descript-ion-hidden');
 
-	const modals = new Set<CommentModal>();
 	let active = true;
 	let requestId = 0;
-	let editRequestId = 0;
 	let updateTimer: number | undefined;
 
 	function cancelSchedule(): void {
@@ -26,8 +24,6 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 	plugin.register(() => {
 		active = false;
 		cancelSchedule();
-		for (const modal of modals) modal.close();
-		modals.clear();
 		statusBarEl.remove();
 	});
 
@@ -57,6 +53,7 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 	}
 
 	async function update(): Promise<void> {
+		if (!active) return;
 		const file = workspace.getActiveFile();
 		if (!file || !isCommentTarget(file.path)) {
 			requestId++;
@@ -91,25 +88,13 @@ export function registerStatusBarComment(plugin: Plugin, service: CommentService
 		const file = workspace.getActiveFile();
 		if (!file || !isCommentTarget(file.path)) return;
 
-		const targetPath = file.path;
-		const currentEditRequestId = ++editRequestId;
 		const currentRequestId = ++requestId;
-		const opened = await service.open(targetPath);
-		if (!active || currentEditRequestId !== editRequestId) return;
-		if (workspace.getActiveFile() !== file || file.path !== targetPath) return;
-
-		if (currentRequestId === requestId) render(opened);
-		if (opened.status !== 'ok') {
-			new Notice(t(opened.code));
-			return;
-		}
-
-		const modal = new CommentModal(plugin.app, service, opened.session, opened.comment, () => {
-			modals.delete(modal);
-			void update();
+		await editor.openActive(file, {
+			onRead: opened => {
+				if (currentRequestId === requestId) render(opened);
+			},
+			onClose: () => { void update(); },
 		});
-		modals.add(modal);
-		modal.open();
 	});
 
 	plugin.registerEvent(workspace.on('file-open', scheduleUpdate));

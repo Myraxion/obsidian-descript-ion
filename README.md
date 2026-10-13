@@ -4,7 +4,9 @@ English | [简体中文](README_zh.md)
 
 Add **file and folder comments** to Obsidian.
 
-All comments are stored in `descript.ion` files in the corresponding directory—a plain-text annotation standard widely adopted by file managers (such as Total Commander). Runs 100% locally with zero network requests, enabling seamless two-way interoperability between Obsidian and external file managers.
+All comments are stored in `descript.ion` files in the corresponding directory, a plain-text format used by file managers such as Total Commander. The plugin runs locally with no network requests and shares UTF-8 comments with compatible external tools.
+
+Requires Obsidian **1.14.4 or later** on desktop. **Windows is the primary supported and tested platform**; macOS and Linux have not received the same level of validation. Mobile is not supported.
 
 ---
 
@@ -14,7 +16,7 @@ All comments are stored in `descript.ion` files in the corresponding directory�
 - 👁️ **Hover Preview**: Hover over any item in the File Explorer to view comments instantly in a lightweight tooltip without opening the file.
 - 📌 **Status Bar Integration**: Real-time display of the active note's comment in the bottom status bar; hover to view full multiline comments, click to open the edit modal directly.
 - 🔄 **Automatic Lifecycle Sync**: Automatically renames, deletes, and migrates comments when files or folders are renamed, deleted, or moved across directories in Obsidian.
-- 🛡️ **Non-intrusive**: Never touches or pollutes your Markdown note content; fully functional even outside of Obsidian.
+- 🛡️ **Non-intrusive**: Stores comments separately from Markdown note content; compatible file managers can read them outside Obsidian.
 
 ---
 
@@ -54,9 +56,10 @@ The plugin automatically maintains `descript.ion` consistency in the background:
 ## ⚙️ Format & Compatibility
 
 - **Storage Specifications**: Standard UTF-8 encoding (with BOM) and CRLF line breaks; file names containing spaces are automatically enclosed in double quotes.
-- **Multiline Escaping**: Complies with Total Commander's multiline escaping format for seamless two-way compatibility with external tools.
+- **Multiline Escaping**: Uses Total Commander's multiline escaping format. Compatibility is limited to UTF-8 records the plugin can fully parse; ANSI files and unknown third-party markers are read-only.
 - **Scope**: Comments are supported for regular files and folders inside the vault. The vault root and `descript.ion` files themselves cannot have comments.
 - **Record Limit**: Single complete records (including file name, escaped content, and markers) are supported up to 4096 bytes.
+- **Concurrent Editing**: Changes detected before saving block an outdated edit. The plugin does not lock external tools or provide a transaction across directories; avoid simultaneous edits to the same `descript.ion` file.
 
 ---
 
@@ -82,17 +85,17 @@ The plugin automatically maintains `descript.ion` consistency in the background:
 
 <details>
 <summary><b>Why does it say "Description file is not valid UTF-8 and cannot be modified"?</b></summary>
-To ensure complete data safety, the plugin strictly follows the "read-only protection on anomaly" principle. If an existing <code>descript.ion</code> contains ANSI encoding, duplicate entries, corrupted records, or unknown third-party markers, the plugin refuses writes to prevent damaging the original file. We recommend opening the file in an external editor and saving it as UTF-8 before editing again.
+The plugin refuses to modify files it cannot fully parse. Non-UTF-8 encoding, duplicate entries, corrupted records, and unknown third-party markers each block writes. For an encoding error, convert the file to UTF-8 in an external editor. Duplicate entries, malformed records, and unknown markers need to be resolved separately before editing again.
 </details>
 
 <details>
 <summary><b>Will hidden descript.ion files on Windows lose their hidden attribute?</b></summary>
-The file remains hidden (+H) after saving. The plugin stages the new bytes in a temporary file before replacing the original. Windows replacement temporarily clears the destination's hidden attribute and restores it on success or failure, protecting the old comments from partial writes.
+The plugin stages the new bytes in a temporary file before replacing the original. On Windows, replacement temporarily clears the destination's hidden attribute, then attempts to restore it on success or failure. If the system refuses the attribute change, the file may remain visible.
 </details>
 
 <details>
 <summary><b>Will comments be lost if a move or rename fails?</b></summary>
-No. When moving or renaming across directories, if a target conflict or write failure occurs, the plugin safely preserves the source record and displays a clear error notice, preventing silent data loss.
+For detected conflicts or write failures, the plugin preserves the source record and shows an error notice. Cross-directory moves write the destination first, then remove the source entry; if source cleanup fails, both copies remain. These safeguards do not cover every filesystem failure or simultaneous external write.
 </details>
 
 ---

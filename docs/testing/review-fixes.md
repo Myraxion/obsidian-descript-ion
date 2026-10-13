@@ -67,4 +67,10 @@
 
 自动验证：`npm test` 的 112 项测试通过；`npm run build`（含严格 TypeScript 检查）、`npm run lint`（零错误零警告）与 `git diff --check` 通过。
 
-本次未运行实际 Obsidian/Total Commander 回归。真实应用仍需验证焦点、原生 Escape/Ctrl/Cmd+Enter、弹窗关闭与禁用插件行为；受控 UI adapter 的快捷键回调验证不替代这些验收。
+本次开发阶段未运行实际 Obsidian/Total Commander 回归；后续用户验收确认见下节。受控 UI adapter 的快捷键回调验证不替代真实应用验收。
+
+## 最新版本真实应用验收（2026-10-13）
+
+用户确认最新版本已完成真实应用验收，包括上述维护执行与编辑器生命周期重构后的版本。验收结论依据用户确认记录，本次未另行记录环境明细与逐项结果。
+
+发布兼容性声明同步调整：插件 `1.0.0` 的最低 Obsidian 版本为 `1.14.4`，`manifest.json` 与 `versions.json` 保持一致；优先支持 Windows，中英文 README 明确桌面平台范围及格式、外部并发写入与迁移保护的限制。
